@@ -18,17 +18,26 @@ import pandas as pd
 
 _ML_MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "nn.joblib"
 _wp_model = None
+_wp_model_load_attempted = False
 
 def _load_wp_model():
-    """Load the win-probability model once; returns None if file missing."""
-    global _wp_model
+    """Load the win-probability model once; returns None when unavailable or unloadable."""
+    global _wp_model, _wp_model_load_attempted
     if _wp_model is not None:
         return _wp_model
-    if not _ML_MODEL_PATH.is_file():
+    if _wp_model_load_attempted:
         return None
-    import joblib
-    _wp_model = joblib.load(_ML_MODEL_PATH)
-    return _wp_model
+    _wp_model_load_attempted = True
+    if not _ML_MODEL_PATH.is_file():
+        print(f"WP model not found at {_ML_MODEL_PATH}; using fallback probabilities.")
+        return None
+    try:
+        import joblib
+        _wp_model = joblib.load(_ML_MODEL_PATH)
+        return _wp_model
+    except Exception as e:
+        print(f"WP model load failed ({_ML_MODEL_PATH}): {e}. Using fallback probabilities.")
+        return None
 
 _SEC_PER_QUARTER = 720
 _SEC_TOTAL_REGULATION = 2880

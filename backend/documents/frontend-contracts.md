@@ -107,13 +107,35 @@ export type LeagueStandingsResponse = LeagueStandingsItem[];
 ### Endpoint
 - `ws://<host>/ws`
 
-### Server-to-client event
-- Message type: text frame containing JSON string.
-- Parsed payload: `GameWithProbability[]`
+### Topics
+- `games`: full snapshot stream (`GameWithProbability[]`).
+- `game:<game_id>`: single-game stream (`GameWithProbability`).
 
-### Client-to-server expectation
-- Backend currently waits for incoming text frames in a loop.
-- Frontend should send periodic heartbeat text (for example every 20-30s) to keep connection behavior predictable.
+### Client-to-server messages
+- Message type: text frame containing JSON.
+- Subscribe:
+```json
+{"action":"subscribe","topic":"games"}
+```
+- Subscribe to one game:
+```json
+{"action":"subscribe","topic":"game:401706123"}
+```
+- Unsubscribe:
+```json
+{"action":"unsubscribe","topic":"game:401706123"}
+```
+- Heartbeat:
+  - Non-JSON text is allowed and ignored by backend.
+
+### Server-to-client events
+- Message type: text frame containing JSON.
+- Subscription ack shape:
+```json
+{"ok":true,"action":"subscribe","topic":"games"}
+```
+- `games` topic payload: `GameWithProbability[]`.
+- `game:<game_id>` topic payload: `GameWithProbability`.
 
 ## Contract Caveats
 

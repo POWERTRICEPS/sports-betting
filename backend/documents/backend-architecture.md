@@ -9,7 +9,7 @@ Primary flow:
 2. Parse each event into normalized game objects.
 3. Compute win probabilities per game.
 4. Store results in in-memory module state.
-5. Broadcast full snapshot to active WebSocket clients.
+5. Broadcast topic-based updates to subscribed WebSocket clients.
 
 ## Core Modules
 
@@ -51,8 +51,13 @@ Primary flow:
 ## WebSocket Broadcast Model
 
 - WebSocket clients connect to `/ws`.
-- On each poll tick, backend broadcasts the full games array as JSON text.
-- Failed sends are currently swallowed in `broadcast_json`.
+- Clients are tracked by topic in memory (topic -> websocket set).
+- Default subscription on connect: `games`.
+- Supported topics:
+  - `games` -> full game snapshot array.
+  - `game:<game_id>` -> per-game payload for one game.
+- On each poll tick, backend broadcasts to each topic independently.
+- Disconnect removes the socket from all subscribed topics.
 
 ## CORS/Frontend Integration
 
