@@ -305,6 +305,7 @@ def games():
     Data is from in-memory store updated every 5s by background poll.
     Gracefully handles no available games by returning empty list.
     """
+    print("games route hit")
     g = list(app_state.games)
     p = dict(app_state.probabilities)
     
