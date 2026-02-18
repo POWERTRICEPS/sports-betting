@@ -170,18 +170,36 @@ Frontend guidance:
 ## WebSocket
 
 ### `WS /ws`
-Push channel for live game snapshots.
+Topic-based push channel for live game updates.
 
 Behavior:
-- Server accepts connection and stores socket in a connection manager.
-- On each 5-second poll, server broadcasts full array payload (same shape as `GET /api/games`).
-- In the websocket handler loop, server waits for incoming text from client (`await websocket.receive_text()`).
+- Server accepts connection and auto-subscribes client to `games` topic.
+- Clients can subscribe/unsubscribe to specific topics by sending JSON text messages.
+- On each 5-second poll:
+  - Topic `games` receives full array payload (same shape as `GET /api/games`).
+  - Topic `game:<game_id>` receives one game object for that game id.
 
 Client requirement:
-- Send heartbeat text periodically or keepalive messages to avoid idle disconnect in environments that require activity.
+- Send heartbeat text periodically (non-JSON text is ignored).
+- Send JSON messages to manage topic subscriptions.
 
-Message payload shape:
-- JSON-encoded `GameWithProbability[]`.
+Client -> Server messages:
+
+```json
+{"action":"subscribe","topic":"games"}
+{"action":"subscribe","topic":"game:401706123"}
+{"action":"unsubscribe","topic":"game:401706123"}
+```
+
+Server ack message:
+
+```json
+{"ok":true,"action":"subscribe","topic":"games"}
+```
+
+Server -> Client payload shapes:
+- Topic `games`: JSON-encoded `GameWithProbability[]`
+- Topic `game:<game_id>`: JSON-encoded `GameWithProbability`
 
 ## CORS
 

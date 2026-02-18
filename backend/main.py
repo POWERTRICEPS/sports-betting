@@ -138,8 +138,26 @@ async def update_games_and_probabilities():
     app_state.probabilities.update(probabilities)
     
     result = merge_gp(games, probabilities)
-    print(f"Broadcasting {len(result)} games to {len(manager.active_connections)} clients\n")
-    await manager.broadcast_json(result)
+    games_targets = manager.topic_connection_labels("games")
+    print(
+        f"[broadcast] topic=games payload=GameWithProbability[] games={len(result)} "
+        f"subscribers={len(games_targets)} active_total={len(manager.active_connections)} "
+        f"targets={games_targets}"
+    )
+    # Broadcast to games dashboard
+    await manager.broadcast_to_topic("games", result)
+    # Broadcast to singel gameID (todo: remove and create separate function to send per game stats needed)
+    for game in result:
+        game_id = game.get("game_id")
+        if game_id:
+            topic = f"game:{game_id}"
+            topic_targets = manager.topic_connection_labels(topic)
+            if topic_targets:
+                print(
+                    f"[broadcast] topic={topic} payload=GameWithProbability "
+                    f"subscribers={len(topic_targets)} targets={topic_targets}"
+                )
+            await manager.broadcast_to_topic(topic, game)
 
 async def poll_loop():
     """Poll the NBA API every 5 seconds and update the games and probabilities."""
@@ -154,23 +172,84 @@ async def poll_loop():
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
+        self.active_connections: set[WebSocket] = set()
+        self.topic_connections: dict[str, set[WebSocket]] = {}
+        self.connection_topics: dict[WebSocket, set[str]] = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self.active_connections.add(websocket)
+        # Keep existing clients working by defaulting to the aggregate stream.
+        await self.subscribe(websocket, "games")
+        print(
+            f"[ws] connected client={self.connection_label(websocket)} "
+            f"active_total={len(self.active_connections)}"
+        )
 
     async def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+        topics = list(self.connection_topics.get(websocket, set()))
+        for topic in topics:
+            await self.unsubscribe(websocket, topic)
+        self.connection_topics.pop(websocket, None)
+        self.active_connections.discard(websocket)
+        print(
+            f"[ws] disconnected client={self.connection_label(websocket)} "
+            f"active_total={len(self.active_connections)}"
+        )
 
-    async def broadcast_json(self, payload: Any):
+    async def subscribe(self, websocket: WebSocket, topic: str):
+        if not topic:
+            return
+        self.topic_connections.setdefault(topic, set()).add(websocket)
+        self.connection_topics.setdefault(websocket, set()).add(topic)
+        print(
+            f"[ws] subscribe client={self.connection_label(websocket)} "
+            f"topic={topic} subscribers={self.topic_size(topic)}"
+        )
+
+    async def unsubscribe(self, websocket: WebSocket, topic: str):
+        subscribers = self.topic_connections.get(topic)
+        if not subscribers:
+            return
+        subscribers.discard(websocket)
+        if not subscribers:
+            self.topic_connections.pop(topic, None)
+
+        topics = self.connection_topics.get(websocket)
+        if topics:
+            topics.discard(topic)
+            if not topics:
+                self.connection_topics.pop(websocket, None)
+        print(
+            f"[ws] unsubscribe client={self.connection_label(websocket)} "
+            f"topic={topic} subscribers={self.topic_size(topic)}"
+        )
+
+    def topic_size(self, topic: str) -> int:
+        return len(self.topic_connections.get(topic, set()))
+
+    def connection_label(self, websocket: WebSocket) -> str:
+        client = websocket.client
+        if client:
+            return f"{client.host}:{client.port}"
+        return f"ws:{id(websocket)}"
+
+    def topic_connection_labels(self, topic: str) -> list[str]:
+        return [self.connection_label(c) for c in self.topic_connections.get(topic, set())]
+
+    async def broadcast_to_topic(self, topic: str, payload: Any):
+        subscribers = list(self.topic_connections.get(topic, set()))
+        if not subscribers:
+            return
         txt = json.dumps(payload)
-        for c in self.active_connections:
+        dead_connections: list[WebSocket] = []
+        for c in subscribers:
             try:
                 await c.send_text(txt)
             except Exception:
-                pass
+                dead_connections.append(c)
+        for c in dead_connections:
+            await self.disconnect(c)
 
 
 manager = ConnectionManager()
@@ -458,6 +537,26 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            message = await websocket.receive_text()
+            if not message:
+                continue
+
+            action = None
+            topic = None
+            try:
+                payload = json.loads(message)
+                if isinstance(payload, dict):
+                    action = payload.get("action") or payload.get("type")
+                    topic = payload.get("topic")
+            except json.JSONDecodeError:
+                # Ignore non-JSON heartbeat text.
+                continue
+
+            if action == "subscribe" and isinstance(topic, str):
+                await manager.subscribe(websocket, topic)
+                await websocket.send_json({"ok": True, "action": "subscribe", "topic": topic})
+            elif action == "unsubscribe" and isinstance(topic, str):
+                await manager.unsubscribe(websocket, topic)
+                await websocket.send_json({"ok": True, "action": "unsubscribe", "topic": topic})
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
