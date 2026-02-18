@@ -4,16 +4,31 @@ import Image from "next/image";
 import { Game } from '@/app/types';
 import { useGameData } from '@/app/GameDataProvider';
 import { mockGames } from '../mock';
+import { useEffect, useState } from "react";
 
 export default function GameClient({ id }: { id: string }) {
     const imgSize = 150;
-    let { games, status, error } = useGameData();
-    if (!games.length) games = mockGames;
-    console.log(games[0].game_id, id);
-    const game: Game | undefined = games.find((g) => g.game_id === id);
-    if (!game) {
-        
-    }
+    const [game, setGame] = useState<Game | null>(null);
+
+    useEffect(() => {
+        async function fetchGame() {
+            try {
+                const res = await fetch(`https://pj09-sports-betting.onrender.com/api/games/stats/${id}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const data = await res.json();
+                setGame(data);
+            } catch (err) {
+                console.error("Failed to fetch game data:", err);
+                // Fallback to mock data if fetch fails
+                const fallbackGame = mockGames[0];
+                setGame(fallbackGame);
+            }
+        }
+        fetchGame();
+    }, [id]);
+
+    //TODO: SUBSCRIBE TO WEBSOCKET UPDATES ON PER GAME BASIS
+    // WAITING FOR BACKEND TO SUPPORT THIS
 
     return (
         <div className="min-h-screen bg-white p-6 pt-20 text-gray-900">
@@ -196,9 +211,6 @@ export default function GameClient({ id }: { id: string }) {
 
                 <div className="mt-8 p-6 rounded-lg text-center">
                     <h1 className="text-xl font-bold text-gray-900">Graph here later</h1>
-                </div>
-                <div className="mt-6 text-sm text-gray-500">
-                    {error ? ` • ${error}` : null}
                 </div>
             </div>
         </div>
