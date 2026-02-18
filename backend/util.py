@@ -16,7 +16,7 @@ import re
 
 import pandas as pd
 
-_ML_MODEL_PATH = Path(__file__).resolve().parent.parent / "ml" / "nn.joblib"
+_ML_MODEL_PATH = Path(__file__).resolve().parent / "pred_models" / "lr.joblib"
 _wp_model = None
 _wp_model_load_attempted = False
 
