@@ -1,4 +1,4 @@
-# Date of Retrospective: 01/24/25
+# Date of Retrospective: 02/13/25
 
 * Led by: Junhyung Yoon
 * Present: Alvin Chan, Logan Melgoza, Raymond Xie, Ali Shadid, Junhyung Yoon, Jay Yueng, Kevin Yang
