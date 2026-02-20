@@ -29,10 +29,10 @@ export default function Standings() {
   useEffect(() => {
     async function fetchStandings() {
       try {
-        // Replace with your actual backend endpoint (e.g., 'http://127.0.0.1:8000/standings')
-        const res = await fetch("https://pj09-sports-betting.onrender.com/api/standings"); 
+        const res = await fetch(
+          "https://pj09-sports-betting.onrender.com/api/standings",
+        );
         const json = await res.json();
-        
         // standings.py returns a list containing one dict: [{...}]
         if (Array.isArray(json) && json.length > 0) {
           setData(json[0]);
@@ -55,7 +55,7 @@ export default function Standings() {
     <div className="rounded-xl border border-zinc-200 bg-white p-6 h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-zinc-900">NBA Standings</h2>
-        
+
         {/* Conference Toggle */}
         <div className="flex rounded-md bg-zinc-100 p-1">
           <button
@@ -105,20 +105,37 @@ export default function Standings() {
               </thead>
               <tbody className="divide-y divide-zinc-50">
                 {currentStandings.map((team) => (
-                  <tr key={team.team_id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="py-2.5 pl-2 font-medium text-zinc-500 w-8">{team.rank}</td>
+                  <tr
+                    key={team.team_id}
+                    className="hover:bg-zinc-50 transition-colors"
+                  >
+                    <td className="py-2.5 pl-2 font-medium text-zinc-500 w-8">
+                      {team.rank}
+                    </td>
                     <td className="py-2.5">
                       <div className="flex flex-col">
-                        <span className="font-medium text-zinc-900">{team.team_city}</span>
-                        <span className="text-xs text-zinc-400">{team.team_name}</span>
+                        <span className="font-medium text-zinc-900">
+                          {team.team_city}
+                        </span>
+                        <span className="text-xs text-zinc-400">
+                          {team.team_name}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-2.5 text-right pr-2 font-medium text-zinc-700">{team.record}</td>
-                    <td className="py-2.5 text-center text-xs text-zinc-600">{team.team_L10}</td>
-                    <td className={`py-2.5 text-center text-xs font-medium ${
-                      team.curr_streak.includes('W') ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {team.curr_streak.replaceAll(' ', '')}
+                    <td className="py-2.5 text-right pr-2 font-medium text-zinc-700">
+                      {team.record}
+                    </td>
+                    <td className="py-2.5 text-center text-xs text-zinc-600">
+                      {team.team_L10}
+                    </td>
+                    <td
+                      className={`py-2.5 text-center text-xs font-medium ${
+                        team.curr_streak.includes("W")
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {team.curr_streak.replaceAll(" ", "")}
                     </td>
                   </tr>
                 ))}
