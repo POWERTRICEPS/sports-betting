@@ -224,7 +224,7 @@ if __name__ == "__main__":
         full_df = pd.concat(all_rows, ignore_index=True)
         full_df = full_df.sort_values(["SEASON", "GAME_ID"]).reset_index(drop=True)
         os.makedirs("../datasets", exist_ok=True)
-        full_df.to_csv(output_csv, index=False)
+        # full_df.to_csv(output_csv, index=False)
         print(f"Saved {len(full_df)} rows to {output_csv}")
     else:
         print("No rows generated.")
