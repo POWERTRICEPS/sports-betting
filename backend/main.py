@@ -1,9 +1,10 @@
 import asyncio
 import json
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from datetime import date, datetime
@@ -14,8 +15,6 @@ from nba_api.stats.endpoints import leaguestandings, scoreboardv2
 
 from util import compute_win_probabilities, parse_game_data, parse_dashboard_game_data, merge_gp
 import state as app_state
-
-from standings import normalize_league_standings
 
 # NBA stats API TeamID -> ESPN-style abbreviation (for matching scoreboard teams)
 _NBA_TEAM_ID_TO_ABBREV = {
@@ -28,6 +27,12 @@ _NBA_TEAM_ID_TO_ABBREV = {
     1610612757: "POR", 1610612758: "SAC", 1610612759: "SAS", 1610612761: "TOR",
     1610612762: "UTA", 1610612764: "WAS",
 }
+
+_ESPN_STANDINGS_URL = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+_ESPN_STANDINGS_TIMEOUT = 10
+_ESPN_STANDINGS_RETRIES = 3
+_STANDINGS_CACHE: list[dict[str, Any]] | None = None
+_STANDINGS_CACHE_AT: datetime | None = None
 
 
 def _parse_l10(l10_str: str) -> tuple[int, int]:
@@ -81,6 +86,109 @@ def fetch_standings_l10() -> dict[str, tuple[int, int]]:
     except Exception as e:
         print(f"Standings L10 fetch failed: {e}")
     return abbrev_to_l10
+
+
+def _to_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _to_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _format_streak(raw: str) -> str:
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    if " " in s:
+        return s
+    if len(s) >= 2 and s[0] in ("W", "L") and s[1:].isdigit():
+        return f"{s[0]} {s[1:]}"
+    return s
+
+
+def _normalize_espn_entries(entries: list[dict[str, Any]], conference: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for idx, entry in enumerate(entries, start=1):
+        team = entry.get("team") or {}
+        stats = entry.get("stats") or []
+        stats_map: dict[str, Any] = {}
+        for stat in stats:
+            key = stat.get("name") or stat.get("abbreviation")
+            if not key:
+                continue
+            stats_map[key] = stat.get("displayValue") if stat.get("displayValue") is not None else stat.get("value")
+
+        wins = _to_int(stats_map.get("wins"))
+        losses = _to_int(stats_map.get("losses"))
+        rank = _to_int(stats_map.get("playoffSeed"), default=idx)
+
+        out.append(
+            {
+                "team_id": _to_int(team.get("id")),
+                "team_city": team.get("location") or team.get("name") or "",
+                "team_name": team.get("name") or team.get("displayName") or "",
+                "conference": conference,
+                "rank": rank,
+                "record": stats_map.get("summary") or f"{wins}-{losses}",
+                "win_pct": _to_float(stats_map.get("winPercent")),
+                "team_L10": stats_map.get("lastTenGames") or stats_map.get("l10") or "",
+                "curr_streak": _format_streak(str(stats_map.get("streak") or "")),
+            }
+        )
+    out.sort(key=lambda team: team.get("rank", 999))
+    return out
+
+
+def fetch_standings_from_espn() -> list[dict[str, Any]]:
+    global _STANDINGS_CACHE, _STANDINGS_CACHE_AT
+
+    last_error: Exception | None = None
+    for attempt in range(1, _ESPN_STANDINGS_RETRIES + 1):
+        try:
+            resp = requests.get(_ESPN_STANDINGS_URL, timeout=_ESPN_STANDINGS_TIMEOUT)
+            resp.raise_for_status()
+            raw = resp.json()
+
+            east: list[dict[str, Any]] = []
+            west: list[dict[str, Any]] = []
+
+            for child in raw.get("children") or []:
+                conf_name = (child.get("abbreviation") or child.get("name") or "").lower()
+                standings_block = child.get("standings") or {}
+                entries = standings_block.get("entries") or child.get("entries") or []
+                if "east" in conf_name:
+                    east = _normalize_espn_entries(entries, "East")
+                elif "west" in conf_name:
+                    west = _normalize_espn_entries(entries, "West")
+
+            if not east and not west:
+                raise ValueError("ESPN standings payload missing east/west entries")
+
+            result = [{"east_standings": east, "west_standings": west}]
+            _STANDINGS_CACHE = result
+            _STANDINGS_CACHE_AT = datetime.utcnow()
+            return result
+        except Exception as e:
+            last_error = e
+            print(f"ESPN standings fetch failed (attempt {attempt}/{_ESPN_STANDINGS_RETRIES}): {e}")
+            if attempt < _ESPN_STANDINGS_RETRIES:
+                time.sleep(attempt)
+
+    if _STANDINGS_CACHE is not None:
+        cache_age = "unknown"
+        if _STANDINGS_CACHE_AT is not None:
+            cache_age = f"{int((datetime.utcnow() - _STANDINGS_CACHE_AT).total_seconds())}s"
+        print(f"Serving cached standings after upstream failure (cache age: {cache_age}).")
+        return _STANDINGS_CACHE
+
+    raise HTTPException(status_code=503, detail=f"Failed to fetch standings from ESPN: {last_error}")
 
 
 def fetch_games_from_nba() -> list[dict[str, Any]]:
@@ -343,25 +451,8 @@ def games_stats(game_date: str | None = None):
 def standings():
     """
     Retrieve current NBA league standings grouped by conference.
-
-    This endpoint fetches the latest NBA league standings using the
-    `nba_api` statistics endpoint, normalizes the raw response data,
-    and returns structured standings for both the Eastern and Western
-    Conferences.
-
-    The response includes team rankings, records, win percentages,
-    recent performance, and current streak information, and is intended
-    to be consumed by frontend components displaying standings tables.
-
-    Returns:
-        List[Dict]: A list containing a single dictionary with:
-            - "east_standings" (List[Dict]): Eastern Conference standings
-            - "west_standings" (List[Dict]): Western Conference standings
     """
-    response = leaguestandings.LeagueStandings()
-    data = response.get_dict()
-    normalized_standings = normalize_league_standings(data)
-    return normalized_standings
+    return fetch_standings_from_espn()
 
 # Starting Lineups Route
 @app.get("/api/v1/lineups/{game_date}")
