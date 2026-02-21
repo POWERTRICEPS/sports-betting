@@ -6,6 +6,7 @@ import { Game } from '@/app/types';
 import { useGameData } from '@/app/GameDataProvider';
 import { mockGames } from '../mock';
 import { useEffect, useState } from "react";
+import WinProbabilityGraph from "./WinProbabilityGraph";
 
 export default function GameClient({ id }: { id: string }) {
     const imgSize = 150;
@@ -336,10 +337,8 @@ export default function GameClient({ id }: { id: string }) {
 
             </div>
 
-            {/* Graph full width */}
-            <div className="mt-10 p-6 rounded-2xl bg-white shadow-sm border border-gray-200 text-center">
-                <h1 className="text-xl font-bold text-gray-900">Graph</h1>
-            </div>
+            {game && <WinProbabilityGraph game={game} />}
+              
             </div>
         </div>
     );
