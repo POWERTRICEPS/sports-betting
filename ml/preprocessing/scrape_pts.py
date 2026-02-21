@@ -17,27 +17,44 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+import threading
+from tqdm import tqdm
 from nba_api.stats.endpoints import leaguegamefinder, leaguedashplayerstats
+from nba_api.stats.library import http as stats_http
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
-    "Accept": "application/json, text/plain, */*",
+NBA_STATS_HEADERS: dict[str, str] = {
+    "Accept": "application/json, text/plain, /",
+    "Accept-Encoding": "gzip, deflate, br",
     "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "Host": "stats.nba.com",
     "Origin": "https://www.nba.com",
+    "Pragma": "no-cache",
     "Referer": "https://www.nba.com/",
-    "x-nba-stats-origin": "stats",
-    "x-nba-stats-token": "true",
+    "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
+    "User-Agent": (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+    ),
 }
+
+try:       
+    stats_http.NBAStatsHTTP.headers = NBA_STATS_HEADERS
+except Exception:
+    pass
 
 SEC_PER_QUARTER = 720
 REGULATION_SEC = 4 * SEC_PER_QUARTER
 TOP_N_PER_TEAM = 5
 SEASONS = ["2022-23", "2023-24", "2024-25"]
 API_DELAY = 0.600
-# Longer timeout for stats.nba.com (nba_api); default 30s often times out.
 STATS_REQUEST_TIMEOUT = 90
 
 
@@ -79,12 +96,7 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
     """Return (set of player IDs to track, DataFrame of season stats: PLAYER_ID, SEASON_PPG, SEASON_FGA, SEASON_3PA)."""
     for attempt in range(1, 4):
         try:
-            print(f"Fetching season stats for {season}")
-            ld = leaguedashplayerstats.LeagueDashPlayerStats(
-                season=season,
-                headers=HEADERS,
-                timeout=STATS_REQUEST_TIMEOUT,
-            )
+            ld = leaguedashplayerstats.LeagueDashPlayerStats(season=season)
             df = ld.get_data_frames()[0]
             time.sleep(API_DELAY)
             break
@@ -94,8 +106,7 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
     else:
         raise RuntimeError("LeagueDashPlayerStats failed after 3 attempts.")
 
-    # TEAM_ID might be missing; fallback to grouping by TEAM_ABBREVIATION
-    team_col = "TEAM_ID" if "TEAM_ID" in df.columns else "TEAM_ABBREVIATION"
+    team_col = "TEAM_ID"
     df = df[df["GP"].notna() & (df["GP"] > 0)]
     df["PTS"] = pd.to_numeric(df["PTS"], errors="coerce").fillna(0)
     df["FGA"] = pd.to_numeric(df["FGA"], errors="coerce").fillna(0)
@@ -130,8 +141,6 @@ def fetch_games_for_season(season: str) -> pd.DataFrame:
                 season_nullable=season,
                 season_type_nullable="Regular Season",
                 league_id_nullable="00",
-                headers=HEADERS,
-                timeout=STATS_REQUEST_TIMEOUT,
             )
             games = lgf.get_data_frames()[0]
             games["SEASON"] = season
@@ -150,7 +159,7 @@ def fetch_games_for_season(season: str) -> pd.DataFrame:
 
 def fetch_playbyplay(game_id: str) -> list[dict]:
     url = f"https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{game_id}.json"
-    r = requests.get(url, headers=HEADERS, timeout=20)
+    r = requests.get(url, timeout=20)
     r.raise_for_status()
     data = r.json()
     return data.get("game", {}).get("actions", [])
@@ -227,14 +236,11 @@ def build_game_rows(
             player_3pa[pid] = player_3pa.get(pid, 0) + 1
 
     final_points = dict(player_points)
-    # Only emit rows for tracked players who scored at least once (so we have a target)
+
     tracked_with_points = tracked_players & set(final_points.keys())
     if not tracked_with_points:
         return []
 
-    # Substitution timeline for minutes (simplified: we don't have court time in this API easily)
-    # Use elapsed game time as proxy: current_minutes = (REGULATION_SEC - seconds_remaining) / 60
-    # and cap by typical minutes (no sub data in CDN PBP we have). So we use "game time elapsed" as proxy.
     rows = []
     player_points = {p: 0 for p in tracked_with_points}
     player_fga_cur = {p: 0 for p in tracked_with_points}
@@ -292,55 +298,65 @@ def build_game_rows(
 
     return rows
 
+lock = threading.Lock()
+all_rows = []
+
+def scrape_season(season: str):
+    print("Fetching season stats for", season)
+    try:
+        tracked, season_stats_df = get_top_players_and_season_stats(season)
+        print(f"Tracking {len(tracked)} players (top {TOP_N_PER_TEAM} per team).")
+    except Exception as e:
+        print(f"Skipping season {season}: {e}")
+        return
+
+    games_df = fetch_games_for_season(season)
+    games_list = games_df.to_dict("records")
+    for row in tqdm(games_list, desc=f"PBP {season}", unit="game"):
+        game_id = str(row["GAME_ID"])
+        home_id = int(row["HOME_TEAM_ID"])
+        away_id = int(row["AWAY_TEAM_ID"])
+        try:
+            actions = fetch_playbyplay(game_id)
+        except Exception as e:
+            tqdm.write(f"Skip {game_id}: {e}")
+            time.sleep(API_DELAY)
+            continue
+        game_rows = build_game_rows(
+            game_id=game_id,
+            season=season,
+            actions=actions,
+            tracked_players=tracked,
+            season_stats=season_stats_df,
+            home_team_id=home_id,
+            away_team_id=away_id,
+        )
+        global all_rows
+        with lock:
+            all_rows.extend(game_rows)
+        time.sleep(API_DELAY)
+
 
 def main():
+    all_rows.clear()
+
     out_dir = Path(__file__).resolve().parent.parent / "datasets"
     out_dir.mkdir(parents=True, exist_ok=True)
     output_csv = out_dir / "player_points_training.csv"
-    all_rows = []
 
+    threads = []
     for season in SEASONS:
-        print(f"\n--- Season {season} ---")
-        try:
-            tracked, season_stats_df = get_top_players_and_season_stats(season)
-            print(f"Tracking {len(tracked)} players (top {TOP_N_PER_TEAM} per team).")
-        except Exception as e:
-            print(f"Skipping season {season}: {e}")
-            continue
+        thread = threading.Thread(target=scrape_season, args=(season,))
+        threads.append(thread)
+        thread.start()
 
-        games_df = fetch_games_for_season(season)
-        games_list = games_df.to_dict("records")
-        total = len(games_list)
-        print(f"Processing {total} games.")
-
-        for i, row in enumerate(games_list[:50]):
-            game_id = str(row["GAME_ID"])
-            home_id = int(row["HOME_TEAM_ID"])
-            away_id = int(row["AWAY_TEAM_ID"])
-            if (i + 1) % 100 == 0 or i == 0:
-                print(f"  [{i + 1}/{total}] {game_id}")
-            try:
-                actions = fetch_playbyplay(game_id)
-            except Exception as e:
-                print(f"  Skip {game_id}: {e}")
-                time.sleep(API_DELAY)
-                continue
-            game_rows = build_game_rows(
-                game_id=game_id,
-                season=season,
-                actions=actions,
-                tracked_players=tracked,
-                season_stats=season_stats_df,
-                home_team_id=home_id,
-                away_team_id=away_id,
-            )
-            all_rows.extend(game_rows)
-            time.sleep(API_DELAY)
+    for thread in threads:
+        thread.join()
 
     if all_rows:
         df = pd.DataFrame(all_rows)
         df = df.sort_values(["season", "game_id", "player_id", "seconds_remaining"], ascending=[True, True, True, False])
-        # df.to_csv(output_csv, index=False)
+        df.to_csv(output_csv, index=False)
         print(f"\nSaved {len(df)} rows to {output_csv}")
     else:
         print("No rows generated.")
