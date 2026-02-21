@@ -254,6 +254,8 @@ async def update_games_and_probabilities():
     )
     # Broadcast to games dashboard
     await manager.broadcast_to_topic("games", result)
+
+    """
     # Broadcast to singel gameID (todo: remove and create separate function to send per game stats needed)
     for game in result:
         game_id = game.get("game_id")
@@ -266,6 +268,45 @@ async def update_games_and_probabilities():
                     f"subscribers={len(topic_targets)} targets={topic_targets}"
                 )
             await manager.broadcast_to_topic(topic, game)
+    """
+
+async def update_subscribed_game_stats():
+    """
+    Fetch full stats ONLY for subscribed games and broadcast.
+    """
+    game_ids = get_subscribed_game_ids()
+
+    if not game_ids:
+        return
+    try:
+        # Fetch full detailed game stats
+        games = fetch_games_from_nba()
+
+        # Compute win probabilities
+        probabilities = compute_win_probabilities(games)
+
+        for game_id in game_ids:
+            target = next(
+                (g for g in games if g["game_id"] == game_id),
+                None
+            )
+            if not target:
+                continue
+
+            merged = merge_gp([target], probabilities)[0]
+
+            topic = f"game:{game_id}"
+
+            # Broadcast only to subscribers
+            await manager.broadcast_to_topic(topic, merged)
+
+            print(
+                f"[broadcast] detailed topic={topic} "
+                f"subs={manager.topic_size(topic)}"
+            )
+
+    except Exception as e:
+        print(f"detailed update error: {e}")
 
 async def poll_loop():
     """Poll the NBA API every 5 seconds and update the games and probabilities."""
@@ -276,6 +317,36 @@ async def poll_loop():
             print(f"poll error: {e}")
         
         await asyncio.sleep(5)
+
+# New poll loop       
+async def detailed_poll_loop():
+    """
+    Poll detailed stats for subscribed games.
+    """
+    while True:
+        try:
+            await update_subscribed_game_stats()
+        except Exception as e:
+            print(f"detailed poll loop error: {e}")
+
+        await asyncio.sleep(5)
+
+
+def get_subscribed_game_ids() -> list[str]:
+    """
+    Returns list of subscribed game_ids from topics like 'game:{id}'
+    """
+    ids = []
+
+    for topic in manager.topic_connections.keys():
+        if topic.startswith("game:"):
+            game_id = topic.split("game:")[1]
+            if game_id:
+                ids.append(game_id)
+
+    return ids
+
+
 
 
 class ConnectionManager:
@@ -364,14 +435,17 @@ manager = ConnectionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan for the FastAPI app."""
-    poll_task = asyncio.create_task(poll_loop())
+    dashboard_task = asyncio.create_task(poll_loop())
+    detailed_task = asyncio.create_task(detailed_poll_loop())
     try:
         yield
+
     finally:
-        poll_task.cancel()
+        dashboard_task.cancel()
+        detailed_task.cancel()
         try:
-            await poll_task
+            await dashboard_task
+            await detailed_task
         except asyncio.CancelledError:
             pass
 
