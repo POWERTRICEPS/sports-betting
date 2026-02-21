@@ -4,6 +4,8 @@ import Image from "next/image";
 import { Game } from '@/app/types';
 import { useGameData } from '@/app/useGameData';
 import { mockGames } from '../mock';
+import WinProbabilityChart, { ProbabilityDataPoint } from '../WinProbabilityChart';
+import { mockProbData } from '../mockProbChart';
 
 export default function GameClient({ id }: { id: string }) {
     const imgSize = 150;
@@ -195,7 +197,7 @@ export default function GameClient({ id }: { id: string }) {
                 </div>
 
                 <div className="mt-8 p-6 rounded-lg text-center">
-                    <h1 className="text-xl font-bold text-gray-900">Graph here later</h1>
+                    <WinProbabilityChart data={mockProbData} />
                 </div>
                 <div className="mt-6 text-sm text-gray-500">
                     {error ? ` • ${error}` : null}
