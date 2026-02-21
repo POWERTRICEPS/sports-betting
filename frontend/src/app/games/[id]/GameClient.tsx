@@ -1,5 +1,6 @@
 'use client';
 
+import Link from "next/link";
 import Image from "next/image";
 import { Game } from '@/app/types';
 import { useGameData } from '@/app/GameDataProvider';
@@ -32,186 +33,313 @@ export default function GameClient({ id }: { id: string }) {
 
     return (
         <div className="min-h-screen bg-white p-6 pt-20 text-gray-900">
+            <div className="absolute top-20 left-6">
+                <Link
+                href="/"
+                className="inline-flex items-center gap-2 bg-blue-900/75 hover:bg-blue-900 text-white font-semibold py-2 px-4 rounded-lg shadow-md backdrop-blur-md transition-all duration-200"
+                >
+                <span className="text-lg leading-none">←</span>
+                Back to Games
+                </Link>
+            </div>
+            <div className="mx-auto max-w-7xl"></div>
             <div className="mx-auto max-w-7xl">
-                <div className="p-6 sm:p-8">
-                    <div className="flex items-center justify-between gap-4 sm:gap-8">
-                        <div className="flex-1 text-center">
-                            {game && <Image
-                                src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${game?.away_abbreviation}.png&h=456&w=456`}
-                                alt={`${game?.away_team} logo`}
-                                width={imgSize}
-                                height={imgSize}
-                                className="mx-auto mb-3"
-                            />}
-                            <div className="text-xs font-bold uppercase tracking-widest text-gray-600">
-                                {game?.away_city}
-                            </div>
-                            <div className="text-lg font-bold text-gray-900 sm:text-2xl">
-                                {game?.away_team}
-                            </div>
-                            <div className="text-xs text-gray-600">
-                                {game?.away_wins}-{game?.away_losses}
-                            </div>
+                <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-8 sm:p-10">
+                <div className="flex items-center justify-between gap-8">
+
+                    {/* Away Team */}
+                    <div className="flex-1 text-center">
+                    {game && (
+                        <Image
+                        src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${game?.away_abbreviation}.png&h=456&w=456`}
+                        alt={`${game?.away_team} logo`}
+                        width={180}
+                        height={180}
+                        className="mx-auto mb-4"
+                        />
+                    )}
+                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                        {game?.away_city}
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">
+                        {game?.away_team}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                        {game?.away_wins}-{game?.away_losses}
+                    </div>
+                    </div>
+
+                    {/* Score + Game Info */}
+                    <div className="flex flex-col items-center gap-6">
+
+                    {/* Main Score */}
+                    <div className="flex items-center gap-6">
+                        <div className="text-6xl font-extrabold text-gray-900 tracking-tight">
+                        {game?.away_score}
                         </div>
-
-                        <div className="flex flex-col items-center gap-2">
-                            <div className="flex items-center gap-3 sm:gap-4">
-                                <div className="rounded-lg px-3 py-2 sm:px-4 sm:py-3">
-                                    <div className="text-3xl font-black text-black sm:text-4xl">
-                                        {game?.away_score}
-                                    </div>
-                                </div>
-                                <div className="text-lg font-bold text-gray-600 sm:text-xl">
-                                    -
-                                </div>
-                                <div className="rounded-lg px-3 py-2 sm:px-4 sm:py-3">
-                                    <div className="text-3xl font-black text-black sm:text-4xl">
-                                        {game?.home_score}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="rounded-full px-3 py-1 text-xs font-bold tracking-widest">
-                                {game?.status}
-                            </div>
-
-                            <div className="mt-8 mx-auto max-w-4xl">
-                                <table className="w-full text-xs">
-                                    <thead>
-                                        <tr>
-                                            <th className="p-1 text-left font-semibold">Team</th>
-                                            <th className="p-1 text-center font-semibold">Q1</th>
-                                            <th className="p-1 text-center font-semibold">Q2</th>
-                                            <th className="p-1 text-center font-semibold">Q3</th>
-                                            <th className="p-1 text-center font-semibold">Q4</th>
-                                            <th className="p-1 text-center font-semibold">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td className="p-1 font-semibold">{game?.home_team}</td>
-                                            <td className="p-1 text-center">{game?.home_q1 ?? '-'}</td>
-                                            <td className="p-1 text-center">{game?.home_q2 ?? '-'}</td>
-                                            <td className="p-1 text-center">{game?.home_q3 ?? '-'}</td>
-                                            <td className="p-1 text-center">{game?.home_q4 ?? '-'}</td>
-                                            <td className="p-1 text-center font-semibold">{game?.home_score}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="p-1 font-semibold">{game?.away_team}</td>
-                                            <td className="p-1 text-center">{game?.away_q1 ?? '-'}</td>
-                                            <td className="p-1 text-center">{game?.away_q2 ?? '-'}</td>
-                                            <td className="p-1 text-center">{game?.away_q3 ?? '-'}</td>
-                                            <td className="p-1 text-center">{game?.away_q4 ?? '-'}</td>
-                                            <td className="p-1 text-center font-semibold">{game?.away_score}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                        <div className="text-3xl font-semibold text-gray-400">
+                        -
                         </div>
-
-                        <div className="flex-1 text-center">
-                            {game && <Image
-                                src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${game?.home_abbreviation}.png&h=456&w=456`}
-                                alt={`${game?.home_team} logo`}
-                                width={imgSize}
-                                height={imgSize}
-                                className="mx-auto mb-3"
-                            />}
-                            <div className="text-xs font-bold uppercase tracking-widest text-gray-600">
-                                {game?.home_city}
-                            </div>
-                            <div className="text-lg font-bold text-gray-900 sm:text-2xl">
-                                {game?.home_team}
-                            </div>
-                            <div className="text-xs text-gray-600">
-                                {game?.home_wins}-{game?.home_losses}
-                            </div>
+                        <div className="text-6xl font-extrabold text-gray-900 tracking-tight">
+                        {game?.home_score}
                         </div>
                     </div>
+
+                    {/* Status */}
+                    <div className="rounded-full bg-gray-100 px-4 py-1 text-xs font-bold tracking-widest text-gray-700">
+                        {game?.status}
+                    </div>
+
+                    {/* Quarter Table */}
+                    <div className="mt-2">
+                        <table className="text-base border-separate border-spacing-y-2">
+                        <thead>
+                            <tr className="text-gray-500 uppercase text-xs tracking-wide">
+                            <th className="px-4 text-left">Team</th>
+                            <th className="px-4 text-center">Q1</th>
+                            <th className="px-4 text-center">Q2</th>
+                            <th className="px-4 text-center">Q3</th>
+                            <th className="px-4 text-center">Q4</th>
+                            <th className="px-4 text-center font-semibold">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                            <td className="px-4 font-semibold">{game?.away_team}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q1 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q2 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q3 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q4 ?? '-'}</td>
+                            <td className="px-4 text-center text-xl font-bold">{game?.away_score}</td>
+                            </tr>
+                            <tr>
+                            <td className="px-4 font-semibold">{game?.home_team}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q1 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q2 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q3 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q4 ?? '-'}</td>
+                            <td className="px-4 text-center text-xl font-bold">{game?.home_score}</td>
+                            </tr>
+                        </tbody>
+                        </table>
+                    </div>
+                    </div>
+
+                    {/* Home Team */}
+                    <div className="flex-1 text-center">
+                    {game && (
+                        <Image
+                        src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${game?.home_abbreviation}.png&h=456&w=456`}
+                        alt={`${game?.home_team} logo`}
+                        width={180}
+                        height={180}
+                        className="mx-auto mb-4"
+                        />
+                    )}
+                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                        {game?.home_city}
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">
+                        {game?.home_team}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                        {game?.home_wins}-{game?.home_losses}
+                    </div>
+                    </div>
+
+                </div>
                 </div>
             </div>
 
-            <div className="mx-auto mt-8 max-w-4xl text-gray-700">
-                <div className="grid grid-cols-1 gap-6 items-center md:grid-cols-3 border-b border-gray-200 pb-6">
+            <div className="mx-auto mt-10 max-w-6xl text-gray-700">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                {/* Game Leaders */}
+                <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-6 text-center">
+                    Game Leaders
+                </h3>
+
+                {/* Team Headers */}
+                <div className="grid grid-cols-3 mb-4">
+                    <div className="text-left font-semibold text-gray-600 uppercase tracking-wide">
+                    {game?.away_team}
+                    </div>
+                    <div></div>
+                    <div className="text-right font-semibold text-gray-600 uppercase tracking-wide">
+                    {game?.home_team}
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+
+                    {/* Points */}
+                    <div className="grid grid-cols-3 items-center">
                     <div className="text-left">
-                        <h4 className="text-sm font-medium text-gray-600 mb-3">{game?.away_team}</h4>
-                        <div className="space-y-4">
-                            <div className="">
-                                <span className="font-semibold text-gray-900">{game?.away_leader_pts_name} {game?.away_leader_pts_val}</span>
-                            </div>
-                            <div className="">
-                                <span className="font-semibold text-gray-900 ">{game?.away_leader_reb_name} {game?.away_leader_reb_val}</span>
-                            </div>
-                            <div className="">
-                                <span className="font-semibold text-gray-900">{game?.away_leader_ast_name} {game?.away_leader_ast_val}</span>
-                            </div>
-                        </div>
+                        <span className="font-semibold">
+                        {game?.away_leader_pts_name ?? '-'}
+                        </span>
+                        <span className="ml-2 text-gray-500">
+                        {game?.away_leader_pts_val ?? ''}
+                        </span>
                     </div>
 
-                    <div className="text-center">
-                        <h4 className="text-gray-900 font-semibold">Player Stats</h4>
-                        <div className="space-y-6">
-                            <div className="text-gray-600 font-semibold">Points</div>
-                            <div className="text-gray-600 font-semibold">Rebounds</div>
-                            <div className="text-gray-600 font-semibold">Assists</div>
-                        </div>
+                    <div className="text-center text-gray-500 font-semibold">
+                        Points
                     </div>
 
                     <div className="text-right">
-                        <h4 className="text-sm font-medium text-gray-600 mb-3">{game?.home_team}</h4>
-                        <div className="space-y-4">
-                            <div className="">
-                                <span className="font-semibold text-gray-900">{game?.home_leader_pts_name} {game?.home_leader_pts_val}</span>
-                            </div>
-                            <div className="">
-                                <span className="font-semibold text-gray-900">{game?.home_leader_reb_name} {game?.home_leader_reb_val}</span>
-                            </div>
-                            <div className="">
-                                <span className="font-semibold text-gray-900">{game?.home_leader_ast_name} {game?.home_leader_ast_val}</span>
-                            </div>
-                        </div>
+                        <span className="font-semibold">
+                        {game?.home_leader_pts_name ?? '-'}
+                        </span>
+                        <span className="ml-2 text-gray-500">
+                        {game?.home_leader_pts_val ?? ''}
+                        </span>
                     </div>
+                    </div>
+
+                    {/* Rebounds */}
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left">
+                        <span className="font-semibold">
+                        {game?.away_leader_reb_name ?? '-'}
+                        </span>
+                        <span className="ml-2 text-gray-500">
+                        {game?.away_leader_reb_val ?? ''}
+                        </span>
+                    </div>
+
+                    <div className="text-center text-gray-500 font-semibold">
+                        Rebounds
+                    </div>
+
+                    <div className="text-right">
+                        <span className="font-semibold">
+                        {game?.home_leader_reb_name ?? '-'}
+                        </span>
+                        <span className="ml-2 text-gray-500">
+                        {game?.home_leader_reb_val ?? ''}
+                        </span>
+                    </div>
+                    </div>
+
+                    {/* Assists */}
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left">
+                        <span className="font-semibold">
+                        {game?.away_leader_ast_name ?? '-'}
+                        </span>
+                        <span className="ml-2 text-gray-500">
+                        {game?.away_leader_ast_val ?? ''}
+                        </span>
+                    </div>
+
+                    <div className="text-center text-gray-500 font-semibold">
+                        Assists
+                    </div>
+
+                    <div className="text-right">
+                        <span className="font-semibold">
+                        {game?.home_leader_ast_name ?? '-'}
+                        </span>
+                        <span className="ml-2 text-gray-500">
+                        {game?.home_leader_ast_val ?? ''}
+                        </span>
+                    </div>
+                    </div>
+
+                </div>
                 </div>
 
                 {/* Team Stats */}
-                <div className="mt-8 mx-auto max-w-4xl">
-                    <div className="grid grid-cols-3 gap-4 items-start text-sm">
-                        <div className="text-left space-y-2 text-gray-900">
-                            <div>{game?.away_team}</div>
-                            <div className="font-semibold">{game?.away_points ?? game?.away_score}</div>
-                            <div className="font-semibold">{game?.away_reb ?? '-'}</div>
-                            <div className="font-semibold">{game?.away_ast ?? '-'}</div>
-                            <div className="font-semibold">{game?.away_fgm ?? '-'} / {game?.away_fga ?? '-'}</div>
-                            <div className="font-semibold">{game?.away_3pm ?? '-'} / {game?.away_3pa ?? '-'}</div>
-                            <div className="font-semibold">{game?.away_ftm ?? '-'} / {game?.away_fta ?? '-'}</div>
-                        </div>
+                <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-6 text-center">
+                    Team Stats
+                </h3>
 
-                        <div className="text-center space-y-2 text-gray-600">
-                            <h4 className="text-gray-900 font-semibold">Team Stats</h4>
-                            <div className="space-y-2">
-                                <div>Points</div>
-                                <div>Rebounds</div>
-                                <div>Assists</div>
-                                <div>FGM / FGA</div>
-                                <div>3PM / 3PA</div>
-                                <div>FTM / FTA</div>
-                            </div>
-                        </div>                
+                <div className="space-y-4">
 
-                        <div className="text-right space-y-2 text-gray-900">
-                            <div>{game?.home_team}</div>
-                            <div className="font-semibold">{game?.home_points ?? game?.home_score}</div>
-                            <div className="font-semibold">{game?.home_reb ?? '-'}</div>
-                            <div className="font-semibold">{game?.home_ast ?? '-'}</div>
-                            <div className="font-semibold">{game?.home_fgm ?? '-'} / {game?.home_fga ?? '-'}</div>
-                            <div className="font-semibold">{game?.home_3pm ?? '-'} / {game?.home_3pa ?? '-'}</div>
-                            <div className="font-semibold">{game?.home_ftm ?? '-'} / {game?.home_fta ?? '-'}</div>
-                        </div>
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left font-semibold">
+                        {game?.away_points ?? game?.away_score ?? '-'}
                     </div>
+                    <div className="text-center text-gray-500 font-semibold">
+                        Points
+                    </div>
+                    <div className="text-right font-semibold">
+                        {game?.home_points ?? game?.home_score ?? '-'}
+                    </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left font-semibold">
+                        {game?.away_reb ?? '-'}
+                    </div>
+                    <div className="text-center text-gray-500 font-semibold">
+                        Rebounds
+                    </div>
+                    <div className="text-right font-semibold">
+                        {game?.home_reb ?? '-'}
+                    </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left font-semibold">
+                        {game?.away_ast ?? '-'}
+                    </div>
+                    <div className="text-center text-gray-500 font-semibold">
+                        Assists
+                    </div>
+                    <div className="text-right font-semibold">
+                        {game?.home_ast ?? '-'}
+                    </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left font-semibold">
+                        {game?.away_fgm ?? '-'} / {game?.away_fga ?? '-'}
+                    </div>
+                    <div className="text-center text-gray-500 font-semibold">
+                        FGM / FGA
+                    </div>
+                    <div className="text-right font-semibold">
+                        {game?.home_fgm ?? '-'} / {game?.home_fga ?? '-'}
+                    </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left font-semibold">
+                        {game?.away_3pm ?? '-'} / {game?.away_3pa ?? '-'}
+                    </div>
+                    <div className="text-center text-gray-500 font-semibold">
+                        3PM / 3PA
+                    </div>
+                    <div className="text-right font-semibold">
+                        {game?.home_3pm ?? '-'} / {game?.home_3pa ?? '-'}
+                    </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 items-center">
+                    <div className="text-left font-semibold">
+                        {game?.away_ftm ?? '-'} / {game?.away_fta ?? '-'}
+                    </div>
+                    <div className="text-center text-gray-500 font-semibold">
+                        FTM / FTA
+                    </div>
+                    <div className="text-right font-semibold">
+                        {game?.home_ftm ?? '-'} / {game?.home_fta ?? '-'}
+                    </div>
+                    </div>
+
+                </div>
                 </div>
 
-                <div className="mt-8 p-6 rounded-lg text-center">
-                    <h1 className="text-xl font-bold text-gray-900">Graph here later</h1>
-                </div>
+            </div>
+
+            {/* Graph full width */}
+            <div className="mt-10 p-6 rounded-2xl bg-white shadow-sm border border-gray-200 text-center">
+                <h1 className="text-xl font-bold text-gray-900">Graph</h1>
+            </div>
             </div>
         </div>
     );
