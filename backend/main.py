@@ -138,7 +138,7 @@ def _normalize_espn_entries(entries: list[dict[str, Any]], conference: str) -> l
                 "rank": rank,
                 "record": stats_map.get("summary") or f"{wins}-{losses}",
                 "win_pct": _to_float(stats_map.get("winPercent")),
-                "team_L10": stats_map.get("lastTenGames") or stats_map.get("l10") or "",
+                "team_L10": stats_map.get("Last Ten Games") or "",
                 "curr_streak": _format_streak(str(stats_map.get("streak") or "")),
             }
         )
