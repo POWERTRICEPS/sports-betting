@@ -13,7 +13,7 @@ export default function GameCard({ data }: { data: Game }) {
   return (
     <Link 
       href={`/games/${data.game_id}`}
-       className="border border-gray-300 rounded-lg p-6 bg-white shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+       className="border border-gray-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-900 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
       {/* Status / Time Remaining */}
       <div className="text-center mb-4">
         <p className="text-sm text-gray-500">{data.status}</p>
@@ -33,16 +33,16 @@ export default function GameCard({ data }: { data: Game }) {
             />
           </div>
           <h3 className="font-bold text-lg">{data.home_team}</h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-zinc-300">
             {data.home_wins}-{data.home_losses}
           </p>
-          <p className="text-3xl font-bold text-blue-600 mt-2">
+          <p className="text-3xl font-bold text-blue-500 dark:text-blue-400 mt-2">
             {data.home_score}
           </p>
         </div>
 
         {/* Divider */}
-        <div className="px-4 text-gray-300 text-2xl">vs</div>
+        <div className="px-4 text-gray-300 dark:text-zinc-500 text-2xl">vs</div>
 
         {/* Team 2 */}
         <div className="flex-1 text-center">
@@ -55,20 +55,20 @@ export default function GameCard({ data }: { data: Game }) {
             />
 
           <h3 className="font-bold text-lg">{data.away_team}</h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-zinc-300">
             {data.away_wins}-{data.away_losses}
           </p>
-          <p className="text-3xl font-bold text-red-600 mt-2">
+          <p className="text-3xl font-bold text-red-500 dark:text-red-400 mt-2">
             {data.away_score}
           </p>
         </div>
       </div>
 
       {/* Win Probabilities */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
+      <div className="mt-6 pt-4 border-t border-gray-200 dark:border-zinc-700">
         <div className="flex justify-between items-center">
-          <span className="text-gray-700 font-medium">Win Prob:</span>
-          <span className="font-bold text-lg text-green-600">
+          <span className="text-gray-700 dark:text-zinc-200 font-medium">Win Prob:</span>
+          <span className="font-bold text-lg text-green-600 dark:text-emerald-400">
             {formatProb(data.home_win_prob ?? null)} / {formatProb(data.away_win_prob ?? null)}
           </span>
         </div>
