@@ -359,6 +359,7 @@ def standings():
             - "east_standings" (List[Dict]): Eastern Conference standings
             - "west_standings" (List[Dict]): Western Conference standings
     """
+    print("standings route hit")
     response = leaguestandings.LeagueStandings()
     data = response.get_dict()
     normalized_standings = normalize_league_standings(data)

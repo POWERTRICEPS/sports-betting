@@ -4,8 +4,8 @@ Build a dataset with the listed features to train a model that predicts a player
 total points at the end of the game from in-game state.
 
 Features:
-  seconds_remaining, current_points, current_minutes, season_ppg, season_fga, fga_so_far,
-  3pa_so_far, season_3pa, score_differential
+  seconds_remaining, current_points, current_minutes, season_ppg, season_fga, season_mpg,
+  fga_so_far, 3pa_so_far, season_3pa, score_differential
 
 Target:
   final_points (total points the player scores in the game)
@@ -93,7 +93,7 @@ def seconds_remaining_in_game(period: int, clock_sec: int | None) -> int | None:
 
 
 def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFrame]:
-    """Return (set of player IDs to track, DataFrame of season stats: PLAYER_ID, SEASON_PPG, SEASON_FGA, SEASON_3PA)."""
+    """Return (set of player IDs to track, DataFrame of season stats: PLAYER_ID, SEASON_PPG, SEASON_FGA, SEASON_3PA, SEASON_MPG)."""
     for attempt in range(1, 4):
         try:
             ld = leaguedashplayerstats.LeagueDashPlayerStats(season=season)
@@ -112,6 +112,24 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
     df["FGA"] = pd.to_numeric(df["FGA"], errors="coerce").fillna(0)
     df["FG3A"] = pd.to_numeric(df["FG3A"], errors="coerce").fillna(0)
     df["GP"] = pd.to_numeric(df["GP"], errors="coerce").fillna(1)
+
+    def parse_min(s):
+        if pd.isna(s):
+            return float("nan")
+        s = str(s).strip()
+        if ":" in s:
+            parts = s.split(":", 1)
+            try:
+                return int(parts[0]) + int(parts[1]) / 60.0
+            except (ValueError, IndexError):
+                return float("nan")
+        try:
+            return float(s)
+        except ValueError:
+            return float("nan")
+    min_series = pd.to_numeric(df["MIN"], errors="coerce")
+    min_series = min_series.fillna(df["MIN"].map(parse_min))
+    df["SEASON_MPG"] = min_series / df["GP"]
     df["SEASON_PPG"] = df["PTS"] / df["GP"]
     df["SEASON_FGA"] = df["FGA"] / df["GP"]
     df["SEASON_3PA"] = df["FG3A"] / df["GP"]
@@ -128,6 +146,7 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
                 "SEASON_PPG": float(row["SEASON_PPG"]),
                 "SEASON_FGA": float(row["SEASON_FGA"]),
                 "SEASON_3PA": float(row["SEASON_3PA"]),
+                "SEASON_MPG": float(row["SEASON_MPG"]),
             })
     stats_df = pd.DataFrame(season_stats)
     return top_players, stats_df
@@ -222,6 +241,9 @@ def build_game_rows(
     def get_season_3pa(pid: int) -> float:
         return stats_by_player.get(pid, {}).get("SEASON_3PA", 0.0)
 
+    def get_season_mpg(pid: int) -> float:
+        return stats_by_player.get(pid, {}).get("SEASON_MPG", 0.0)
+
     # First pass: accumulate points/FGA/3PA per player
     for action in actions:
         pid = action.get("personId") or 0
@@ -289,6 +311,7 @@ def build_game_rows(
             "current_minutes": round(current_minutes, 2),
             "season_ppg": round(get_season_ppg(pid), 2),
             "season_fga": round(get_season_fga(pid), 2),
+            "season_mpg": round(get_season_mpg(pid), 2),
             "fga_so_far": player_fga_cur.get(pid, 0),
             "3pa_so_far": player_3pa_cur.get(pid, 0),
             "season_3pa": round(get_season_3pa(pid), 2),
