@@ -14,3 +14,16 @@
 | Mon 2/9   | Ali Shahid    | Led Daily Scrum                       |
 | Wed 2/11  | Kevin Yang    | Led Daily Scrum                       |
 | Fri 2/13  | Jun Yoon      | Led Retro                             |
+
+
+
+# Assigned Roles
+- Product Owner: Logan Melgoza
+- Scrum Master: Kevin Yang
+- Testing/QA Coordinator: Raymond Xie
+- Retro 3 leader: Jay Yeung
+- UX Coordinator: Ali Shahid
+- Design Document Coordinator: Alvin Chan
+- Deployment Document Coordinator: Tim Nguyen
+- User Manual Coordinator: Jun Yoon
+- Final presentation leader (week 9/10): Logan Melgoza

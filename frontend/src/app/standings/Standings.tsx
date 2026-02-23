@@ -30,9 +30,11 @@ export default function Standings() {
     async function fetchStandings() {
       try {
         // Replace with your actual backend endpoint (e.g., 'http://127.0.0.1:8000/standings')
-        const res = await fetch("https://pj09-sports-betting.onrender.com/api/standings"); 
+        const res = await fetch("https://pj09-sports-betting.onrender.com/api/standings");
+        // const res = await fetch("http://localhost:8000/api/standings");
         const json = await res.json();
-        
+        console.log(json);
+
         // standings.py returns a list containing one dict: [{...}]
         if (Array.isArray(json) && json.length > 0) {
           setData(json[0]);
@@ -119,6 +121,37 @@ export default function Standings() {
                       team.curr_streak.includes('W') ? 'text-green-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
                     }`}>
                       {team.curr_streak.replaceAll(' ', '')}
+                  <tr
+                    key={team.team_id}
+                    className="hover:bg-zinc-50 transition-colors"
+                  >
+                    <td className="py-2.5 pl-2 font-medium text-zinc-500 w-8">
+                      {team.rank}
+                    </td>
+                    <td className="py-2.5">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-zinc-900">
+                          {team.team_city}
+                        </span>
+                        <span className="text-xs text-zinc-400">
+                          {team.team_name}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 text-right pr-2 font-medium text-zinc-700">
+                      {team.record}
+                    </td>
+                    <td className="py-2.5 text-center text-xs text-zinc-600">
+                      {team.team_L10}
+                    </td>
+                    <td
+                      className={`py-2.5 text-center text-xs font-medium ${
+                        team.curr_streak.includes("W")
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {team.curr_streak.replaceAll(" ", "")}
                     </td>
                   </tr>
                 ))}
