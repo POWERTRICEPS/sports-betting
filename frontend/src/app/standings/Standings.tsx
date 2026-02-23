@@ -30,8 +30,8 @@ export default function Standings() {
     async function fetchStandings() {
       try {
         // Replace with your actual backend endpoint (e.g., 'http://127.0.0.1:8000/standings')
-        // const res = await fetch("https://pj09-sports-betting.onrender.com/api/standings");
-        const res = await fetch("http://localhost:8000/api/standings");
+        const res = await fetch("https://pj09-sports-betting.onrender.com/api/standings");
+        // const res = await fetch("http://localhost:8000/api/standings");
         const json = await res.json();
         console.log(json);
 
