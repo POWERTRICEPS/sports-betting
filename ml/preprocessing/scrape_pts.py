@@ -46,16 +46,18 @@ NBA_STATS_HEADERS: dict[str, str] = {
 }
 
 try:       
+    stats_http.headers = NBA_STATS_HEADERS
     stats_http.NBAStatsHTTP.headers = NBA_STATS_HEADERS
+    stats_http.NBAStatsHTTP._session = None
+    base_http.NBAHTTP._session = None
 except Exception:
     pass
 
 SEC_PER_QUARTER = 720
 REGULATION_SEC = 4 * SEC_PER_QUARTER
-TOP_N_PER_TEAM = 5
-SEASONS = ["2022-23", "2023-24", "2024-25"]
+TOP_N_PER_TEAM = 10
+SEASONS = ["2022-23"]
 API_DELAY = 0.600
-STATS_REQUEST_TIMEOUT = 90
 
 
 def parse_clock_to_seconds(clock: str | None) -> int | None:
@@ -96,7 +98,9 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
     """Return (set of player IDs to track, DataFrame of season stats: PLAYER_ID, SEASON_PPG, SEASON_FGA, SEASON_3PA, SEASON_MPG)."""
     for attempt in range(1, 4):
         try:
+            print("HI")
             ld = leaguedashplayerstats.LeagueDashPlayerStats(season=season)
+            print("HI2")
             df = ld.get_data_frames()[0]
             time.sleep(API_DELAY)
             break
@@ -129,10 +133,14 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
             return float("nan")
     min_series = pd.to_numeric(df["MIN"], errors="coerce")
     min_series = min_series.fillna(df["MIN"].map(parse_min))
+    df["REB"] = pd.to_numeric(df["REB"], errors="coerce").fillna(0)
+    df["AST"] = pd.to_numeric(df["AST"], errors="coerce").fillna(0)
     df["SEASON_MPG"] = min_series / df["GP"]
     df["SEASON_PPG"] = df["PTS"] / df["GP"]
     df["SEASON_FGA"] = df["FGA"] / df["GP"]
     df["SEASON_3PA"] = df["FG3A"] / df["GP"]
+    df["SEASON_RPG"] = df["REB"] / df["GP"]
+    df["SEASON_APG"] = df["AST"] / df["GP"]
 
     top_players = set()
     season_stats = []
@@ -147,6 +155,8 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
                 "SEASON_FGA": float(row["SEASON_FGA"]),
                 "SEASON_3PA": float(row["SEASON_3PA"]),
                 "SEASON_MPG": float(row["SEASON_MPG"]),
+                "SEASON_RPG": float(row["SEASON_RPG"]),
+                "SEASON_APG": float(row["SEASON_APG"]),
             })
     stats_df = pd.DataFrame(season_stats)
     return top_players, stats_df
@@ -212,6 +222,18 @@ def is_fga(action: dict) -> bool:
     return at in ("2pt", "3pt")
 
 
+def is_rebound(action: dict) -> bool:
+    return (action.get("actionType") or "").lower() == "rebound"
+
+
+def get_assist_person_id(action: dict) -> int | None:
+    """Return personId of the assister if this action has an assist, else None."""
+    aid = action.get("assistPersonId")
+    if aid is not None and aid != 0:
+        return int(aid)
+    return None
+
+
 def build_game_rows(
     game_id: str,
     season: str,
@@ -222,14 +244,15 @@ def build_game_rows(
     away_team_id: int,
 ) -> list[dict]:
     """
-    First pass: compute final points per player.
+    First pass: compute final points/rebounds/assists per player.
     Second pass: at each scoring play for a tracked player, emit a row (state after the play).
     """
-    # Final points per player (from full PBP)
     final_points: dict[int, int] = {}
     player_points: dict[int, int] = {}
     player_fga: dict[int, int] = {}
     player_3pa: dict[int, int] = {}
+    player_rebounds: dict[int, int] = {}
+    player_assists: dict[int, int] = {}
     stats_by_player = season_stats.set_index("PLAYER_ID").to_dict("index") if not season_stats.empty else {}
 
     def get_season_ppg(pid: int) -> float:
@@ -244,29 +267,43 @@ def build_game_rows(
     def get_season_mpg(pid: int) -> float:
         return stats_by_player.get(pid, {}).get("SEASON_MPG", 0.0)
 
-    # First pass: accumulate points/FGA/3PA per player
+    def get_season_rebounds(pid: int) -> float:
+        return stats_by_player.get(pid, {}).get("SEASON_RPG", 0.0)
+
+    def get_season_assists(pid: int) -> float:
+        return stats_by_player.get(pid, {}).get("SEASON_APG", 0.0)
+
+    # First pass: accumulate points, FGA, 3PA, rebounds, assists per player
     for action in actions:
         pid = action.get("personId") or 0
-        if pid == 0:
-            continue
-        pts = points_on_play(action)
-        if pts > 0:
-            player_points[pid] = player_points.get(pid, 0) + pts
-        if is_fga(action):
-            player_fga[pid] = player_fga.get(pid, 0) + 1
-        if is_three_attempt(action):
-            player_3pa[pid] = player_3pa.get(pid, 0) + 1
+        if pid != 0:
+            pts = points_on_play(action)
+            if pts > 0:
+                player_points[pid] = player_points.get(pid, 0) + pts
+            if is_fga(action):
+                player_fga[pid] = player_fga.get(pid, 0) + 1
+            if is_three_attempt(action):
+                player_3pa[pid] = player_3pa.get(pid, 0) + 1
+            if is_rebound(action):
+                player_rebounds[pid] = player_rebounds.get(pid, 0) + 1
+        aid = get_assist_person_id(action)
+        if aid is not None:
+            player_assists[aid] = player_assists.get(aid, 0) + 1
 
     final_points = dict(player_points)
-
     tracked_with_points = tracked_players & set(final_points.keys())
     if not tracked_with_points:
         return []
+
+    final_rebounds = {p: player_rebounds.get(p, 0) for p in tracked_with_points}
+    final_assists = {p: player_assists.get(p, 0) for p in tracked_with_points}
 
     rows = []
     player_points = {p: 0 for p in tracked_with_points}
     player_fga_cur = {p: 0 for p in tracked_with_points}
     player_3pa_cur = {p: 0 for p in tracked_with_points}
+    player_rebounds_cur = {p: 0 for p in tracked_with_points}
+    player_assists_cur = {p: 0 for p in tracked_with_points}
     home_score = 0
     away_score = 0
 
@@ -289,6 +326,13 @@ def build_game_rows(
         current_minutes = game_elapsed_sec / 60.0
 
         pid = action.get("personId") or 0
+        # Update rebounds/assists for any tracked player on this action (before we possibly continue)
+        if is_rebound(action) and pid in tracked_with_points:
+            player_rebounds_cur[pid] = player_rebounds_cur.get(pid, 0) + 1
+        aid = get_assist_person_id(action)
+        if aid is not None and aid in tracked_with_points:
+            player_assists_cur[aid] = player_assists_cur.get(aid, 0) + 1
+
         if pid not in tracked_with_points:
             continue
 
@@ -315,8 +359,14 @@ def build_game_rows(
             "fga_so_far": player_fga_cur.get(pid, 0),
             "3pa_so_far": player_3pa_cur.get(pid, 0),
             "season_3pa": round(get_season_3pa(pid), 2),
+            "current_rebounds": player_rebounds_cur.get(pid, 0),
+            "season_rebounds": round(get_season_rebounds(pid), 2),
+            "current_assists": player_assists_cur.get(pid, 0),
+            "season_assists": round(get_season_assists(pid), 2),
             "score_differential": score_diff,
             "final_points": final_points[pid],
+            "final_rebounds": final_rebounds[pid],
+            "final_assists": final_assists[pid],
         })
 
     return rows
@@ -365,7 +415,7 @@ def main():
 
     out_dir = Path(__file__).resolve().parent.parent / "datasets"
     out_dir.mkdir(parents=True, exist_ok=True)
-    output_csv = out_dir / "player_points_training.csv"
+    output_csv = out_dir / "props_training.csv"
 
     threads = []
     for season in SEASONS:
