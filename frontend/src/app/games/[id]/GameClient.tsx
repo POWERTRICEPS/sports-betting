@@ -3,25 +3,30 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Game } from '@/app/types';
-import { useGameData } from '@/app/GameDataProvider';
 import { mockGames } from '../mock';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import WinProbabilityGraph from "./WinProbabilityGraph";
+
+const BACKEND_URL = "pj09-sports-betting.onrender.com";
+const isLocal = BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
+const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
+const API_URL = isLocal ? `http://${BACKEND_URL}` : `https://${BACKEND_URL}`;
 
 export default function GameClient({ id }: { id: string }) {
     const imgSize = 150;
     const [game, setGame] = useState<Game | null>(null);
+    const wsRef = useRef<WebSocket | null>(null);
 
+    // Initial HTTP fetch for immediate data on page load
     useEffect(() => {
         async function fetchGame() {
             try {
-                const res = await fetch(`https://pj09-sports-betting.onrender.com/api/games/stats/${id}`);
+                const res = await fetch(`${API_URL}/api/games/stats/${id}`);
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
                 setGame(data);
             } catch (err) {
                 console.error("Failed to fetch game data:", err);
-                // Fallback to mock data if fetch fails
                 const fallbackGame = mockGames[0];
                 setGame(fallbackGame);
             }
@@ -29,8 +34,53 @@ export default function GameClient({ id }: { id: string }) {
         fetchGame();
     }, [id]);
 
-    //TODO: SUBSCRIBE TO WEBSOCKET UPDATES ON PER GAME BASIS
-    // WAITING FOR BACKEND TO SUPPORT THIS
+    // WebSocket subscription for live updates
+    useEffect(() => {
+        const topic = `game:${id}`;
+
+        function connect() {
+            const ws = new WebSocket(WS_URL);
+            wsRef.current = ws;
+
+            ws.onopen = () => {
+                console.log(`[GameClient] WebSocket connected, subscribing to ${topic}`);
+                ws.send(JSON.stringify({ type: "subscribe", topic }));
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    // Ignore subscription ack messages
+                    if (data.ok !== undefined) return;
+                    setGame(data);
+                } catch (err) {
+                    console.error("[GameClient] Failed to parse WS message:", err);
+                }
+            };
+
+            ws.onerror = (event) => {
+                console.error("[GameClient] WebSocket error:", event);
+            };
+
+            ws.onclose = () => {
+                console.log(`[GameClient] WebSocket closed for ${topic}`);
+            };
+        }
+
+        connect();
+
+        // Cleanup: unsubscribe and close on unmount or when id changes
+        return () => {
+            const ws = wsRef.current;
+            if (ws) {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "unsubscribe", topic }));
+                }
+                ws.close();
+                wsRef.current = null;
+            }
+        };
+    }, [id]);
 
     return (
         <div className="min-h-screen bg-white p-6 pt-20 text-gray-900">
