@@ -83,7 +83,7 @@ export default function GameClient({ id }: { id: string }) {
     }, [id]);
 
     return (
-        <div className="min-h-screen bg-white p-6 pt-20 text-gray-900">
+        <div className="min-h-screen bg-white dark:bg-zinc-950 p-6 pt-20 text-gray-900 dark:text-zinc-100">
             <div className="absolute top-20 left-6">
                 <Link
                 href="/"
@@ -95,7 +95,7 @@ export default function GameClient({ id }: { id: string }) {
             </div>
             <div className="mx-auto max-w-7xl"></div>
             <div className="mx-auto max-w-7xl">
-                <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-8 sm:p-10">
+                <div className="rounded-2xl bg-white dark:bg-zinc-900 shadow-sm border border-gray-200 dark:border-zinc-700 p-8 sm:p-10">
                 <div className="flex items-center justify-between gap-8">
 
                     {/* Away Team */}
@@ -109,13 +109,13 @@ export default function GameClient({ id }: { id: string }) {
                         className="mx-auto mb-4"
                         />
                     )}
-                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-zinc-400">
                         {game?.away_city}
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-zinc-100">
                         {game?.away_team}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 dark:text-zinc-400">
                         {game?.away_wins}-{game?.away_losses}
                     </div>
                     </div>
@@ -125,19 +125,19 @@ export default function GameClient({ id }: { id: string }) {
 
                     {/* Main Score */}
                     <div className="flex items-center gap-6">
-                        <div className="text-6xl font-extrabold text-gray-900 tracking-tight">
+                        <div className="text-6xl font-extrabold text-gray-900 dark:text-zinc-100 tracking-tight">
                         {game?.away_score}
                         </div>
-                        <div className="text-3xl font-semibold text-gray-400">
+                        <div className="text-3xl font-semibold text-gray-400 dark:text-zinc-500">
                         -
                         </div>
-                        <div className="text-6xl font-extrabold text-gray-900 tracking-tight">
+                        <div className="text-6xl font-extrabold text-gray-900 dark:text-zinc-100 tracking-tight">
                         {game?.home_score}
                         </div>
                     </div>
 
                     {/* Status */}
-                    <div className="rounded-full bg-gray-100 px-4 py-1 text-xs font-bold tracking-widest text-gray-700">
+                    <div className="rounded-full bg-gray-100 dark:bg-zinc-800 px-4 py-1 text-xs font-bold tracking-widest text-gray-700 dark:text-zinc-300">
                         {game?.status}
                     </div>
 
@@ -145,7 +145,7 @@ export default function GameClient({ id }: { id: string }) {
                     <div className="mt-2">
                         <table className="text-base border-separate border-spacing-y-2">
                         <thead>
-                            <tr className="text-gray-500 uppercase text-xs tracking-wide">
+                            <tr className="text-gray-500 dark:text-zinc-400 uppercase text-xs tracking-wide">
                             <th className="px-4 text-left">Team</th>
                             <th className="px-4 text-center">Q1</th>
                             <th className="px-4 text-center">Q2</th>
@@ -156,20 +156,20 @@ export default function GameClient({ id }: { id: string }) {
                         </thead>
                         <tbody>
                             <tr>
-                            <td className="px-4 font-semibold">{game?.away_team}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q1 ?? '-'}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q2 ?? '-'}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q3 ?? '-'}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.away_q4 ?? '-'}</td>
-                            <td className="px-4 text-center text-xl font-bold">{game?.away_score}</td>
+                            <td className="px-4 font-semibold text-zinc-900 dark:text-zinc-100">{game?.away_team}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.away_q1 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.away_q2 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.away_q3 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.away_q4 ?? '-'}</td>
+                            <td className="px-4 text-center text-xl font-bold text-zinc-900 dark:text-zinc-100">{game?.away_score}</td>
                             </tr>
                             <tr>
-                            <td className="px-4 font-semibold">{game?.home_team}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q1 ?? '-'}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q2 ?? '-'}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q3 ?? '-'}</td>
-                            <td className="px-4 text-center text-lg font-semibold">{game?.home_q4 ?? '-'}</td>
-                            <td className="px-4 text-center text-xl font-bold">{game?.home_score}</td>
+                            <td className="px-4 font-semibold text-zinc-900 dark:text-zinc-100">{game?.home_team}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.home_q1 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.home_q2 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.home_q3 ?? '-'}</td>
+                            <td className="px-4 text-center text-lg font-semibold text-zinc-900 dark:text-zinc-100">{game?.home_q4 ?? '-'}</td>
+                            <td className="px-4 text-center text-xl font-bold text-zinc-900 dark:text-zinc-100">{game?.home_score}</td>
                             </tr>
                         </tbody>
                         </table>
@@ -187,13 +187,13 @@ export default function GameClient({ id }: { id: string }) {
                         className="mx-auto mb-4"
                         />
                     )}
-                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-zinc-400">
                         {game?.home_city}
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-zinc-100">
                         {game?.home_team}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 dark:text-zinc-400">
                         {game?.home_wins}-{game?.home_losses}
                     </div>
                     </div>
@@ -202,22 +202,22 @@ export default function GameClient({ id }: { id: string }) {
                 </div>
             </div>
 
-            <div className="mx-auto mt-10 max-w-6xl text-gray-700">
+            <div className="mx-auto mt-10 max-w-6xl text-gray-700 dark:text-zinc-300">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 {/* Game Leaders */}
-                <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-6 text-center">
+                <div className="rounded-2xl bg-white dark:bg-zinc-900 shadow-sm border border-gray-200 dark:border-zinc-700 p-6">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-6 text-center">
                     Game Leaders
                 </h3>
 
                 {/* Team Headers */}
                 <div className="grid grid-cols-3 mb-4">
-                    <div className="text-left font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="text-left font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wide">
                     {game?.away_team}
                     </div>
                     <div></div>
-                    <div className="text-right font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="text-right font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wide">
                     {game?.home_team}
                     </div>
                 </div>
@@ -227,23 +227,23 @@ export default function GameClient({ id }: { id: string }) {
                     {/* Points */}
                     <div className="grid grid-cols-3 items-center">
                     <div className="text-left">
-                        <span className="font-semibold">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_leader_pts_name ?? '-'}
                         </span>
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-gray-500 dark:text-zinc-400">
                         {game?.away_leader_pts_val ?? ''}
                         </span>
                     </div>
 
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         Points
                     </div>
 
                     <div className="text-right">
-                        <span className="font-semibold">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_leader_pts_name ?? '-'}
                         </span>
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-gray-500 dark:text-zinc-400">
                         {game?.home_leader_pts_val ?? ''}
                         </span>
                     </div>
@@ -252,23 +252,23 @@ export default function GameClient({ id }: { id: string }) {
                     {/* Rebounds */}
                     <div className="grid grid-cols-3 items-center">
                     <div className="text-left">
-                        <span className="font-semibold">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_leader_reb_name ?? '-'}
                         </span>
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-gray-500 dark:text-zinc-400">
                         {game?.away_leader_reb_val ?? ''}
                         </span>
                     </div>
 
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         Rebounds
                     </div>
 
                     <div className="text-right">
-                        <span className="font-semibold">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_leader_reb_name ?? '-'}
                         </span>
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-gray-500 dark:text-zinc-400">
                         {game?.home_leader_reb_val ?? ''}
                         </span>
                     </div>
@@ -277,23 +277,23 @@ export default function GameClient({ id }: { id: string }) {
                     {/* Assists */}
                     <div className="grid grid-cols-3 items-center">
                     <div className="text-left">
-                        <span className="font-semibold">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_leader_ast_name ?? '-'}
                         </span>
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-gray-500 dark:text-zinc-400">
                         {game?.away_leader_ast_val ?? ''}
                         </span>
                     </div>
 
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         Assists
                     </div>
 
                     <div className="text-right">
-                        <span className="font-semibold">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_leader_ast_name ?? '-'}
                         </span>
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-gray-500 dark:text-zinc-400">
                         {game?.home_leader_ast_val ?? ''}
                         </span>
                     </div>
@@ -303,81 +303,81 @@ export default function GameClient({ id }: { id: string }) {
                 </div>
 
                 {/* Team Stats */}
-                <div className="rounded-2xl bg-white shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-6 text-center">
+                <div className="rounded-2xl bg-white dark:bg-zinc-900 shadow-sm border border-gray-200 dark:border-zinc-700 p-6">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-6 text-center">
                     Team Stats
                 </h3>
 
                 <div className="space-y-4">
 
                     <div className="grid grid-cols-3 items-center">
-                    <div className="text-left font-semibold">
+                    <div className="text-left font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_points ?? game?.away_score ?? '-'}
                     </div>
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         Points
                     </div>
-                    <div className="text-right font-semibold">
+                    <div className="text-right font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_points ?? game?.home_score ?? '-'}
                     </div>
                     </div>
 
                     <div className="grid grid-cols-3 items-center">
-                    <div className="text-left font-semibold">
+                    <div className="text-left font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_reb ?? '-'}
                     </div>
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         Rebounds
                     </div>
-                    <div className="text-right font-semibold">
+                    <div className="text-right font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_reb ?? '-'}
                     </div>
                     </div>
 
                     <div className="grid grid-cols-3 items-center">
-                    <div className="text-left font-semibold">
+                    <div className="text-left font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_ast ?? '-'}
                     </div>
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         Assists
                     </div>
-                    <div className="text-right font-semibold">
+                    <div className="text-right font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_ast ?? '-'}
                     </div>
                     </div>
 
                     <div className="grid grid-cols-3 items-center">
-                    <div className="text-left font-semibold">
+                    <div className="text-left font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_fgm ?? '-'} / {game?.away_fga ?? '-'}
                     </div>
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         FGM / FGA
                     </div>
-                    <div className="text-right font-semibold">
+                    <div className="text-right font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_fgm ?? '-'} / {game?.home_fga ?? '-'}
                     </div>
                     </div>
 
                     <div className="grid grid-cols-3 items-center">
-                    <div className="text-left font-semibold">
+                    <div className="text-left font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_3pm ?? '-'} / {game?.away_3pa ?? '-'}
                     </div>
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         3PM / 3PA
                     </div>
-                    <div className="text-right font-semibold">
+                    <div className="text-right font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_3pm ?? '-'} / {game?.home_3pa ?? '-'}
                     </div>
                     </div>
 
                     <div className="grid grid-cols-3 items-center">
-                    <div className="text-left font-semibold">
+                    <div className="text-left font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.away_ftm ?? '-'} / {game?.away_fta ?? '-'}
                     </div>
-                    <div className="text-center text-gray-500 font-semibold">
+                    <div className="text-center text-gray-500 dark:text-zinc-400 font-semibold">
                         FTM / FTA
                     </div>
-                    <div className="text-right font-semibold">
+                    <div className="text-right font-semibold text-zinc-900 dark:text-zinc-100">
                         {game?.home_ftm ?? '-'} / {game?.home_fta ?? '-'}
                     </div>
                     </div>

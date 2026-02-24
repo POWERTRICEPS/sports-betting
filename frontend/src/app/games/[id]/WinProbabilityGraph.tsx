@@ -141,20 +141,20 @@ function ProbTooltip({ active, payload, label }: any) {
     const home = payload.find((p: any) => p.dataKey === 'home');
     const away = payload.find((p: any) => p.dataKey === 'away');
     return (
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-md text-xs">
-            <div className="font-semibold text-gray-700 mb-1">{label}</div>
+        <div className="rounded-lg border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 shadow-md text-xs">
+            <div className="font-semibold text-gray-700 dark:text-zinc-200 mb-1">{label}</div>
             {home && (
                 <div className="flex items-center gap-1.5">
                     <span className="inline-block h-2 w-2 rounded-full" style={{ background: '#16a34a' }} />
-                    <span className="text-gray-600">Home:</span>
-                    <span className="font-bold text-gray-900">{home.value.toFixed(1)}%</span>
+                    <span className="text-gray-600 dark:text-zinc-400">Home:</span>
+                    <span className="font-bold text-gray-900 dark:text-zinc-100">{home.value.toFixed(1)}%</span>
                 </div>
             )}
             {away && (
                 <div className="flex items-center gap-1.5">
                     <span className="inline-block h-2 w-2 rounded-full" style={{ background: '#ef4444' }} />
-                    <span className="text-gray-600">Away:</span>
-                    <span className="font-bold text-gray-900">{away.value.toFixed(1)}%</span>
+                    <span className="text-gray-600 dark:text-zinc-400">Away:</span>
+                    <span className="font-bold text-gray-900 dark:text-zinc-100">{away.value.toFixed(1)}%</span>
                 </div>
             )}
         </div>
@@ -172,15 +172,15 @@ export default function WinProbabilityGraph({ game }: WinProbabilityGraphProps) 
 
     return (
         <div className="mt-10 mx-auto max-w-4xl">
-            <h4 className="text-center text-lg font-semibold text-gray-900 mb-1">
+            <h4 className="text-center text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-1">
                 Win Probability
             </h4>
-            <p className="text-center text-xs text-gray-500 mb-4">
+            <p className="text-center text-xs text-gray-500 dark:text-zinc-400 mb-4">
                 {game.away_team} vs {game.home_team}
             </p>
             {isMock && (
                 <div className="text-center mb-4">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
                         </svg>
@@ -252,35 +252,39 @@ export default function WinProbabilityGraph({ game }: WinProbabilityGraphProps) 
             {/* Legend + current probability cards */}
             <div className="grid grid-cols-2 gap-4 mt-6">
                 <div className={`rounded-xl border p-4 text-center transition-all ${
-                    !homeFavored ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                    !homeFavored
+                        ? 'border-green-200 dark:border-emerald-700 bg-green-50 dark:bg-emerald-900/30'
+                        : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800'
                 }`}>
                     <div className="flex items-center justify-center gap-1.5 mb-1">
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">
                             {game.away_team}
                         </span>
                     </div>
-                    <div className={`text-3xl font-black ${!homeFavored ? 'text-green-600' : 'text-gray-700'}`}>
+                    <div className={`text-3xl font-black ${!homeFavored ? 'text-green-600 dark:text-emerald-400' : 'text-gray-700 dark:text-zinc-200'}`}>
                         {awayProb.toFixed(1)}%
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
                         {!homeFavored ? 'Favored' : 'Underdog'}
                     </div>
                 </div>
 
                 <div className={`rounded-xl border p-4 text-center transition-all ${
-                    homeFavored ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+                    homeFavored
+                        ? 'border-green-200 dark:border-emerald-700 bg-green-50 dark:bg-emerald-900/30'
+                        : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800'
                 }`}>
                     <div className="flex items-center justify-center gap-1.5 mb-1">
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-600" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">
                             {game.home_team}
                         </span>
                     </div>
-                    <div className={`text-3xl font-black ${homeFavored ? 'text-green-600' : 'text-gray-700'}`}>
+                    <div className={`text-3xl font-black ${homeFavored ? 'text-green-600 dark:text-emerald-400' : 'text-gray-700 dark:text-zinc-200'}`}>
                         {homeProb.toFixed(1)}%
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
                         {homeFavored ? 'Favored' : 'Underdog'}
                     </div>
                 </div>
