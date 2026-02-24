@@ -7,8 +7,7 @@ import { mockGames } from "../mock";
 import { useEffect, useRef, useState } from "react";
 import WinProbabilityGraph from "./WinProbabilityGraph";
 
-// const BACKEND_URL = "pj09-sports-betting.onrender.com";
-const BACKEND_URL = "localhost:8000";
+const BACKEND_URL = "pj09-sports-betting.onrender.com";
 const isLocal =
   BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
 const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
