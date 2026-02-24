@@ -564,37 +564,6 @@ def _current_nba_season() -> str:
     return f"{year - 1}-{str(year)[-2:]}"
 
 
-def fetch_standings_l10() -> dict[str, tuple[int, int]]:
-    """
-    Fetch league standings from NBA stats API and return mapping
-    abbreviation -> (l10_wins, l10_losses). Uses current season.
-    """
-    abbrev_to_l10: dict[str, tuple[int, int]] = {}
-    try:
-        season = _current_nba_season()
-        response = leaguestandings.LeagueStandings(season_nullable=season)
-        data = response.get_dict()
-        rs = data.get("resultSets") or []
-        if not rs:
-            return abbrev_to_l10
-        headers = rs[0].get("headers") or []
-        rows = rs[0].get("rowSet") or []
-        team_id_idx = headers.index("TeamID") if "TeamID" in headers else -1
-        l10_idx = headers.index("L10") if "L10" in headers else -1
-        if team_id_idx < 0 or l10_idx < 0:
-            return abbrev_to_l10
-        for row in rows:
-            if team_id_idx < len(row) and l10_idx < len(row):
-                team_id = row[team_id_idx]
-                l10_str = row[l10_idx] if isinstance(row[l10_idx], str) else ""
-                abbrev = _NBA_TEAM_ID_TO_ABBREV.get(team_id)
-                if abbrev:
-                    abbrev_to_l10[abbrev] = _parse_l10(l10_str)
-    except Exception as e:
-        print(f"Standings L10 fetch failed: {e}")
-    return abbrev_to_l10
-
-
 def _to_float(value: Any) -> float:
     try:
         return float(value)
@@ -702,6 +671,28 @@ def fetch_standings_from_espn() -> list[dict[str, Any]]:
     raise Exception(f"Failed to fetch standings from ESPN: {last_error}")
 
 
+def _l10_by_abbrev_from_espn_standings() -> dict[str, tuple[int, int]]:
+    """
+    Build mapping abbreviation -> (l10_wins, l10_losses) from fetch_standings_from_espn().
+    Uses team_id from standings + _NBA_TEAM_ID_TO_ABBREV (ESPN uses same team IDs as NBA).
+    """
+    abbrev_to_l10: dict[str, tuple[int, int]] = {}
+    data = fetch_standings_from_espn()
+    block = data[0] if data else {}
+    east = block.get("east_standings") or []
+    west = block.get("west_standings") or []
+    for entry in east + west:
+        team_id = entry.get("team_id")
+        l10_str = (entry.get("team_L10") or "").strip()
+        w, l = _parse_l10(l10_str)
+        abbrev = _NBA_TEAM_ID_TO_ABBREV.get(team_id)
+        if abbrev:
+            abbrev_to_l10[abbrev] = (w, l)
+    if "UTA" in abbrev_to_l10:
+        abbrev_to_l10["UTAH"] = abbrev_to_l10["UTA"]
+    return abbrev_to_l10
+
+
 def fetch_games_from_nba() -> list[dict[str, Any]]:
     """
     Fetch full game data from ESPN API with all stats.
@@ -713,7 +704,7 @@ def fetch_games_from_nba() -> list[dict[str, Any]]:
     raw = resp.json()
     events = raw.get("events", [])
     result = []
-    l10_by_abbrev = fetch_standings_l10()
+    l10_by_abbrev = _l10_by_abbrev_from_espn_standings()
     for event in events:
         payload = parse_game_data(event)
         if payload:
