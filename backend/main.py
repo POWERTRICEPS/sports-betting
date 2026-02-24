@@ -27,10 +27,10 @@ async def update_games_and_probabilities():
     """
     games = fetch_dashboard_games()
     probabilities = compute_win_probabilities(games)
-    app_state.games.clear()
-    app_state.games.extend(games)
-    app_state.probabilities.clear()
-    app_state.probabilities.update(probabilities)
+    app_state.GAMES_STATE.clear()
+    app_state.GAMES_STATE.extend(games)
+    app_state.PROBABILITIES_STATE.clear()
+    app_state.PROBABILITIES_STATE.update(probabilities)
     
     result = merge_gp(games, probabilities)
     games_targets = manager.topic_connection_labels("games")
@@ -266,16 +266,16 @@ def games():
     Gracefully handles no available games by returning empty list.
     """
     print("games route hit")
-    g = list(app_state.games)
-    p = dict(app_state.probabilities)
+    g = list(app_state.GAMES_STATE)
+    p = dict(app_state.PROBABILITIES_STATE)
     
     # If in-memory store is empty (e.g., on first request), fetch fresh data
     if not g:
         try:
             g = fetch_dashboard_games()
             p = compute_win_probabilities(g)
-            app_state.games.extend(g)
-            app_state.probabilities.update(p)
+            app_state.GAMES_STATE.extend(g)
+            app_state.PROBABILITIES_STATE.update(p)
         except Exception as e:
             print(f"Error fetching games: {e}")
             return []
@@ -375,7 +375,7 @@ def single_game_stats(game_id: str):
     First checks in-memory dashboard store, then fetches full stats if needed.
     """
     # Check if game exists in dashboard store first
-    g_dashboard = list(app_state.games)
+    g_dashboard = list(app_state.GAMES_STATE)
     game_exists = any(game["game_id"] == game_id for game in g_dashboard)
     
     if not game_exists:
