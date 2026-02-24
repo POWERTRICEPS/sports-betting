@@ -704,7 +704,7 @@ def fetch_games_from_nba() -> list[dict[str, Any]]:
     raw = resp.json()
     events = raw.get("events", [])
     result = []
-    l10_by_abbrev = _l10_by_abbrev_from_espn_standings()
+    l10_by_abbrev = _l10_by_abbrev_from_espn_standings() # switched to ESPN to avoid slow game details load time
     for event in events:
         payload = parse_game_data(event)
         if payload:
