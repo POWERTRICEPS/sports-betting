@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from 'react';
 import { Game } from '../types';
 import Image from 'next/image';
 import Link from 'next/link';
+import { teamPrimaryColors } from '../resources/colors';
 
 function formatProb(n: number | null) {
   if (n === null || Number.isNaN(n)) return "N/A";
@@ -10,10 +14,26 @@ function formatProb(n: number | null) {
 const imgSize = 100;
 
 export default function GameCard({ data }: { data: Game }) {
+  const [isHovered, setIsHovered] = useState(false);
+  let homePrimary = teamPrimaryColors[data.home_abbreviation] || '#1F2937';
+  let awayPrimary = teamPrimaryColors[data.away_abbreviation] || '#1F2937';
+
   return (
-    <Link 
+    <Link
       href={`/games/${data.game_id}`}
-       className="border border-gray-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-900 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+      className="block border border-gray-300 dark:border-zinc-700 rounded-lg p-6 shadow-md hover:shadow-lg transform transition-all duration-200 hover:scale-105 cursor-pointer"
+      style={{
+        background: `
+          radial-gradient(ellipse 120% 100% at 0% 0%, ${homePrimary}65, transparent 65%),
+          radial-gradient(ellipse 120% 100% at 100% 0%, ${awayPrimary}65, transparent 65%)
+        `,
+        boxShadow: isHovered
+          ? '0 0 30px rgba(100, 220, 255, 0.9), inset 0 0 1px rgba(100, 220, 255, 0.3)'
+          : 'none'
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       {/* Status / Time Remaining */}
       <div className="text-center mb-4">
         <p className="text-sm text-gray-500">{data.status}</p>
@@ -46,14 +66,13 @@ export default function GameCard({ data }: { data: Game }) {
 
         {/* Team 2 */}
         <div className="flex-1 text-center">
-            <Image
-              src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${data.away_abbreviation}.png&h=456&w=456`}
-              alt={`${data.away_team} logo`}
-              width={imgSize}
-              height={imgSize}
-              className="mx-auto"
-            />
-
+          <Image
+            src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${data.away_abbreviation}.png&h=456&w=456`}
+            alt={`${data.away_team} logo`}
+            width={imgSize}
+            height={imgSize}
+            className="mx-auto"
+          />
           <h3 className="font-bold text-lg">{data.away_team}</h3>
           <p className="text-sm text-gray-600 dark:text-zinc-300">
             {data.away_wins}-{data.away_losses}
