@@ -17,7 +17,7 @@ User satisfaction with our win probability model's accuracy based on live game d
 
 **Steps to test**
 1. Load the page
-2. Select 3 games
+2. Select 2 games
 3. Record the predicted home probablity
 4. Navigate to the 3 games on ESPN
 5. Record the difference in home probability (absolute value)
