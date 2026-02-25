@@ -610,6 +610,7 @@ def _normalize_espn_entries(entries: list[dict[str, Any]], conference: str) -> l
                 "team_id": _to_int(team.get("id")),
                 "team_city": team.get("location") or team.get("name") or "",
                 "team_name": team.get("name") or team.get("displayName") or "",
+                "team_abbreviation": team.get("abbreviation") or "",
                 "conference": conference,
                 "rank": rank,
                 "record": stats_map.get("summary") or f"{wins}-{losses}",
