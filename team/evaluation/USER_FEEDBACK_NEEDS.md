@@ -24,3 +24,14 @@ User satisfaction with our win probability model's accuracy based on live game d
 6. Average the difference of the 3 games
 
 Our goal is that our predicitons are within 5% on average when compared to ESPN. Sucess on wednesday would be at least within 10% on average
+
+## Metric 3 - Overall User Satisfaction
+User satisfaction with our overall production. One specific metric we want to improve is the average user satisfaction with the complete product including usefulness, UI design, and responsiveness.
+
+**Steps to test**
+1. Load the page
+2. Navigate the site to different pages and look at components
+3. Rate each usefulness, UI design, and page responsiveness on a scale of 1-10
+4. Record these scores and also the average between the 3.
+
+Our goal is that our product satisfies 75% of users on average with a rating on average of 7 or higher. Success on wednesday will look be 50% on everage with user satisfaction.
