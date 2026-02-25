@@ -15,6 +15,7 @@ export default function GameClient({ id }: { id: string }) {
     useEffect(() => {
         async function fetchGame() {
             try {
+                // const res = await fetch(`http://127.0.0.1:8000/api/games/stats/${id}`);
                 const res = await fetch(`https://pj09-sports-betting.onrender.com/api/games/stats/${id}`);
                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 const data = await res.json();
