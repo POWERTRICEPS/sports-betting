@@ -107,8 +107,8 @@ cd pj09-sports-betting
 ### 2. Switch to local backend
 By default, the frontend (even when running locally) talks to the deployed version of the backend. To run on the local backend you will have to switch the following URLS.
 
-- In frontend/src/app/standings/Standings.tsx, comment out line 34 and uncomment line 33
-- In frontend/src/app/games/[id]/GameClient.tsx, comment out line 19 and uncomment line 18
+- In frontend/src/app/standings/Standings.tsx, comment out line 33 and uncomment line 34
+- In frontend/src/app/games/[id]/GameClient.tsx, comment out line 10 and uncomment line 11
 - In fronetend/src/app/GameDataProvider.tsx, comment out line 13 and uncomment line 14
 
 ### 3. Backend setup
