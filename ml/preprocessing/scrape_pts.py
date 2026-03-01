@@ -20,43 +20,12 @@ import requests
 import threading
 from tqdm import tqdm
 from nba_api.stats.endpoints import leaguegamefinder, leaguedashplayerstats
-from nba_api.stats.library import http as stats_http
-
-NBA_STATS_HEADERS: dict[str, str] = {
-    "Accept": "application/json, text/plain, /",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Cache-Control": "no-cache",
-    "Connection": "keep-alive",
-    "Host": "stats.nba.com",
-    "Origin": "https://www.nba.com",
-    "Pragma": "no-cache",
-    "Referer": "https://www.nba.com/",
-    "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-site",
-    "User-Agent": (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/131.0.0.0 Safari/537.36"
-    ),
-}
-
-try:       
-    stats_http.headers = NBA_STATS_HEADERS
-    stats_http.NBAStatsHTTP.headers = NBA_STATS_HEADERS
-    stats_http.NBAStatsHTTP._session = None
-    base_http.NBAHTTP._session = None
-except Exception:
-    pass
 
 SEC_PER_QUARTER = 720
+OT_PERIOD_SEC = 300
 REGULATION_SEC = 4 * SEC_PER_QUARTER
-TOP_N_PER_TEAM = 10
-SEASONS = ["2022-23"]
+TOP_N_PER_TEAM = 1
+SEASONS = ["2022-23", "2023-24", "2024-25"]
 API_DELAY = 0.600
 
 
@@ -94,13 +63,31 @@ def seconds_remaining_in_game(period: int, clock_sec: int | None) -> int | None:
     return clock_sec
 
 
+def game_elapsed_seconds(period: int, clock_sec: int | None) -> int | None:
+    """Seconds from game start to this (period, clock) moment."""
+    if clock_sec is None or period < 1:
+        return None
+    if period <= 4:
+        return (period - 1) * SEC_PER_QUARTER + (SEC_PER_QUARTER - clock_sec)
+    return REGULATION_SEC + (period - 5) * OT_PERIOD_SEC + (OT_PERIOD_SEC - clock_sec)
+
+
+def is_substitution(action: dict) -> bool:
+    return (action.get("actionType") or "").lower() == "substitution"
+
+
+def substitution_type(action: dict) -> str | None:
+    """Return 'in' or 'out' for substitution, else None."""
+    if not is_substitution(action):
+        return None
+    return (action.get("subType") or "").lower() or None
+
+
 def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFrame]:
     """Return (set of player IDs to track, DataFrame of season stats: PLAYER_ID, SEASON_PPG, SEASON_FGA, SEASON_3PA, SEASON_MPG)."""
     for attempt in range(1, 4):
         try:
-            print("HI")
             ld = leaguedashplayerstats.LeagueDashPlayerStats(season=season)
-            print("HI2")
             df = ld.get_data_frames()[0]
             time.sleep(API_DELAY)
             break
@@ -245,7 +232,7 @@ def build_game_rows(
 ) -> list[dict]:
     """
     First pass: compute final points/rebounds/assists per player.
-    Second pass: at each scoring play for a tracked player, emit a row (state after the play).
+    Second pass: at each play where a tracked player scores, gets a rebound, or gets an assist, emit a row (state after the play).
     """
     final_points: dict[int, int] = {}
     player_points: dict[int, int] = {}
@@ -290,11 +277,17 @@ def build_game_rows(
         if aid is not None:
             player_assists[aid] = player_assists.get(aid, 0) + 1
 
-    final_points = dict(player_points)
-    tracked_with_points = tracked_players & set(final_points.keys())
+    # Include players who scored, got a rebound, or had an assist
+    players_with_stats = (
+        set(player_points.keys())
+        | set(player_rebounds.keys())
+        | set(player_assists.keys())
+    )
+    tracked_with_points = tracked_players & players_with_stats
     if not tracked_with_points:
         return []
 
+    final_points = {p: player_points.get(p, 0) for p in tracked_with_points}
     final_rebounds = {p: player_rebounds.get(p, 0) for p in tracked_with_points}
     final_assists = {p: player_assists.get(p, 0) for p in tracked_with_points}
 
@@ -304,14 +297,23 @@ def build_game_rows(
     player_3pa_cur = {p: 0 for p in tracked_with_points}
     player_rebounds_cur = {p: 0 for p in tracked_with_points}
     player_assists_cur = {p: 0 for p in tracked_with_points}
+    # Player minutes: how many minutes each tracked player has played so far
+    player_minutes_played: dict[int, float] = {p: 0.0 for p in tracked_with_points}
+    player_stint_start_sec: dict[int, float | None] = {p: None for p in tracked_with_points}
     home_score = 0
     away_score = 0
+
+    def period_start_game_sec(p: int) -> float:
+        if p <= 4:
+            return (p - 1) * SEC_PER_QUARTER
+        return REGULATION_SEC + (p - 5) * OT_PERIOD_SEC
 
     for action in actions:
         period = int(action.get("period") or 1)
         clock_sec = parse_clock_to_seconds(action.get("clock"))
         sec_rem = seconds_remaining_in_game(period, clock_sec)
-        if sec_rem is None:
+        game_sec = game_elapsed_seconds(period, clock_sec)
+        if sec_rem is None or game_sec is None:
             continue
         score_h = action.get("scoreHome")
         score_a = action.get("scoreAway")
@@ -322,10 +324,18 @@ def build_game_rows(
             except (TypeError, ValueError):
                 pass
         score_diff = home_score - away_score
-        game_elapsed_sec = REGULATION_SEC - sec_rem if period <= 4 else REGULATION_SEC + (period - 4) * 300 - (clock_sec or 0)
-        current_minutes = game_elapsed_sec / 60.0
 
         pid = action.get("personId") or 0
+
+        # Process substitutions to track player minutes played
+        sub_type = substitution_type(action)
+        if sub_type == "out" and pid in tracked_with_points:
+            start = player_stint_start_sec.get(pid)
+            if start is not None:
+                player_minutes_played[pid] = player_minutes_played.get(pid, 0) + (game_sec - start) / 60.0
+            player_stint_start_sec[pid] = None
+        elif sub_type == "in" and pid in tracked_with_points:
+            player_stint_start_sec[pid] = float(game_sec)
         # Update rebounds/assists for any tracked player on this action (before we possibly continue)
         if is_rebound(action) and pid in tracked_with_points:
             player_rebounds_cur[pid] = player_rebounds_cur.get(pid, 0) + 1
@@ -333,47 +343,62 @@ def build_game_rows(
         if aid is not None and aid in tracked_with_points:
             player_assists_cur[aid] = player_assists_cur.get(aid, 0) + 1
 
-        if pid not in tracked_with_points:
-            continue
-
-        if is_fga(action):
-            player_fga_cur[pid] = player_fga_cur.get(pid, 0) + 1
-        if is_three_attempt(action):
-            player_3pa_cur[pid] = player_3pa_cur.get(pid, 0) + 1
-
+        # Collect all tracked players to emit for this action: scorer, rebounder, assister
         pts = points_on_play(action)
-        if pts == 0:
+        players_to_emit: set[int] = set()
+        if pid in tracked_with_points and (is_rebound(action) or pts > 0):
+            players_to_emit.add(pid)
+        if aid is not None and aid in tracked_with_points:
+            players_to_emit.add(aid)
+        if not players_to_emit:
             continue
-        player_points[pid] = player_points.get(pid, 0) + pts
 
-        rows.append({
-            "game_id": game_id,
-            "player_id": pid,
-            "season": season,
-            "seconds_remaining": sec_rem,
-            "current_points": player_points[pid],
-            "current_minutes": round(current_minutes, 2),
-            "season_ppg": round(get_season_ppg(pid), 2),
-            "season_fga": round(get_season_fga(pid), 2),
-            "season_mpg": round(get_season_mpg(pid), 2),
-            "fga_so_far": player_fga_cur.get(pid, 0),
-            "3pa_so_far": player_3pa_cur.get(pid, 0),
-            "season_3pa": round(get_season_3pa(pid), 2),
-            "current_rebounds": player_rebounds_cur.get(pid, 0),
-            "season_rebounds": round(get_season_rebounds(pid), 2),
-            "current_assists": player_assists_cur.get(pid, 0),
-            "season_assists": round(get_season_assists(pid), 2),
-            "score_differential": score_diff,
-            "final_points": final_points[pid],
-            "final_rebounds": final_rebounds[pid],
-            "final_assists": final_assists[pid],
-        })
+        # Starter backdate for any player we'll emit
+        for p in players_to_emit:
+            if player_stint_start_sec.get(p) is None and not is_substitution(action):
+                player_stint_start_sec[p] = period_start_game_sec(period)
+
+        if pid in tracked_with_points and is_fga(action):
+            player_fga_cur[pid] = player_fga_cur.get(pid, 0) + 1
+        if pid in tracked_with_points and is_three_attempt(action):
+            player_3pa_cur[pid] = player_3pa_cur.get(pid, 0) + 1
+        if pts > 0:
+            player_points[pid] = player_points.get(pid, 0) + pts
+
+        for p in players_to_emit:
+            stint_start = player_stint_start_sec.get(p)
+            if stint_start is not None:
+                current_minutes = player_minutes_played.get(p, 0) + (game_sec - stint_start) / 60.0
+            else:
+                current_minutes = player_minutes_played.get(p, 0)
+
+            rows.append({
+                "game_id": game_id,
+                "player_id": p,
+                "season": season,
+                "seconds_remaining": sec_rem,
+                "current_points": player_points.get(p, 0),
+                "current_minutes": round(current_minutes, 2),
+                "season_ppg": round(get_season_ppg(p), 2),
+                "season_fga": round(get_season_fga(p), 2),
+                "season_mpg": round(get_season_mpg(p), 2),
+                "fga_so_far": player_fga_cur.get(p, 0),
+                "3pa_so_far": player_3pa_cur.get(p, 0),
+                "season_3pa": round(get_season_3pa(p), 2),
+                "current_rebounds": player_rebounds_cur.get(p, 0),
+                "season_rebounds": round(get_season_rebounds(p), 2),
+                "current_assists": player_assists_cur.get(p, 0),
+                "season_assists": round(get_season_assists(p), 2),
+                "score_differential": score_diff,
+                "final_points": final_points[p],
+                "final_rebounds": final_rebounds[p],
+                "final_assists": final_assists[p],
+            })
 
     return rows
 
 lock = threading.Lock()
 all_rows = []
-
 def scrape_season(season: str):
     print("Fetching season stats for", season)
     try:
