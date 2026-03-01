@@ -1,4 +1,4 @@
-# Date of Retrospective: 01/24/25
+# Date of Retrospective: 02/13/25
 
 * Led by: Junhyung Yoon
 * Present: Alvin Chan, Logan Melgoza, Raymond Xie, Ali Shadid, Junhyung Yoon, Jay Yueng, Kevin Yang
@@ -24,3 +24,7 @@
 * We want to be able to get everyone's opinions and combine everyone's take on the start, stop, and continues.
 
 ## Experiment/Change
+* We came up with more issues for the frontend team regarding the UI design, such as darkmode and a set colorscheme, and have a more polished project idea.
+* We make sure that team members use our text message group chat to communicate PRs, and we would see our team be much more active in reviewing PRs without them stacking up.
+* We communicate more on iMessage now and have been better about moving issues from in progress to review to done.
+* We are planning to keep these changes to keep our team more on top of tasks and increase productivity.

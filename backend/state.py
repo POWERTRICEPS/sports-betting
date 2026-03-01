@@ -8,7 +8,11 @@ In-memory store for live game state and win probabilities.
 from typing import Any
 
 # Latest games list: same shape as your existing /games response.
-games: list[dict[str, Any]] = []
+GAMES_STATE: list[dict[str, Any]] = []
 
 # Win probabilities by game_id: { "game_id": { "home_win_prob": 0.6, "away_win_prob": 0.4 } }
-probabilities: dict[str, dict[str, float]] = {}
+PROBABILITIES_STATE: dict[str, dict[str, float]] = {}
+
+# Player props by player name for upcoming days
+# {'player name': {'bookmaker': {'points': {'over_odds': -120, 'under_odds': 100, 'line': 17.5}}}}
+PLAYER_PROPS_STATE: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}   # player name -> bookmaker -> stat -> odds

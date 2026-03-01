@@ -1,7 +1,7 @@
 ///<reference types="jest" />
 
 import { render, screen, waitFor, act } from "@testing-library/react";
-import { useGameData } from "../src/app/useGameData";
+import { useGameData } from "../src/app/GameDataProvider";
 
 // Minimal test component that uses the hook
 function TestComponent() {

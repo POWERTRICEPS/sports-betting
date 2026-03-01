@@ -10,10 +10,36 @@ Structured output:
     }
 }
 """
+import os
+import re
+import time
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-import re
 
+import requests
+
+from nba_api.stats.endpoints import leaguestandings
+
+ODDS_API_KEY = os.getenv("ODDS_API_KEY")
+
+# NBA stats API TeamID -> ESPN-style abbreviation (for matching scoreboard teams)
+_NBA_TEAM_ID_TO_ABBREV = {
+    1610612737: "ATL", 1610612738: "BOS", 1610612751: "BKN", 1610612766: "CHA",
+    1610612741: "CHI", 1610612739: "CLE", 1610612742: "DAL", 1610612743: "DEN",
+    1610612765: "DET", 1610612744: "GSW", 1610612745: "HOU", 1610612754: "IND",
+    1610612746: "LAC", 1610612747: "LAL", 1610612763: "MEM", 1610612748: "MIA",
+    1610612749: "MIL", 1610612750: "MIN", 1610612740: "NOP", 1610612752: "NYK",
+    1610612760: "OKC", 1610612753: "ORL", 1610612755: "PHI", 1610612756: "PHX",
+    1610612757: "POR", 1610612758: "SAC", 1610612759: "SAS", 1610612761: "TOR",
+    1610612762: "UTA", 1610612764: "WAS",
+}
+
+_ESPN_STANDINGS_URL = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+_ESPN_STANDINGS_TIMEOUT = 10
+_ESPN_STANDINGS_RETRIES = 3
+_STANDINGS_CACHE: list[dict[str, Any]] | None = None
+_STANDINGS_CACHE_AT: datetime | None = None
 import pandas as pd
 
 _ML_MODEL_PATH = Path(__file__).resolve().parent / "pred_models" / "wp_lr.joblib"
@@ -389,3 +415,324 @@ def parse_dashboard_game_data(event: dict[str, Any]) -> dict[str, Any] | None:
         "away_losses": a["losses"],
         "away_score": a["score"],
     }
+
+def parse_lineup_data(raw_data: dict, game_date: str) -> dict:
+    """
+    Parse raw NBA lineup data into structured format.
+    
+    Args:
+        raw_data: Raw JSON from NBA stats endpoint
+        game_date: Date string (YYYYMMDD)
+    
+    Returns:
+        Structured lineup data matching acceptance criteria
+    """
+    games = []
+    
+    # Extract teams data from raw response
+    # NBA's structure may vary, so we handle multiple possible formats
+    teams_data = raw_data.get("teams", []) or raw_data.get("resultSets", [])
+    
+    if isinstance(teams_data, list) and len(teams_data) > 0:
+        # Group teams by game
+        games_dict = {}
+        
+        for team_data in teams_data:
+            # Extract team information
+            team_info = {
+                "team_name": team_data.get("team_name") or team_data.get("teamName") or "",
+                "team_abbreviation": team_data.get("team_abbreviation") or team_data.get("teamTricode") or team_data.get("abbr") or "",
+                "starters": []
+            }
+            
+            # Extract starters (usually 5 players)
+            starters_data = team_data.get("starters", []) or team_data.get("players", [])
+            
+            for player in starters_data[:5]:  # Ensure only 5 starters
+                starter = {
+                    "name": player.get("player_name") or player.get("playerName") or player.get("name") or "Unknown",
+                    "position": player.get("position") or player.get("pos") or "",
+                    "player_id": str(player.get("player_id") or player.get("playerId") or player.get("id") or "")
+                }
+                team_info["starters"].append(starter)
+            
+            # Try to extract game_id and group by matchup
+            game_id = team_data.get("game_id") or team_data.get("gameId") or ""
+            
+            if game_id:
+                if game_id not in games_dict:
+                    games_dict[game_id] = {
+                        "game_id": game_id,
+                        "home_team": None,
+                        "away_team": None
+                    }
+                
+                # Determine if home or away (based on indicator in data)
+                is_home = team_data.get("home_away") == "home" or team_data.get("isHome") == True
+                
+                if is_home:
+                    games_dict[game_id]["home_team"] = team_info
+                else:
+                    games_dict[game_id]["away_team"] = team_info
+        
+        # Convert dict to list and filter out incomplete games
+        games = [
+            game for game in games_dict.values() 
+            if game["home_team"] and game["away_team"]
+        ]
+    
+    # Check for confirmed lineups status
+    lineup_status = raw_data.get("LINEUP_STATUS") or raw_data.get("lineupStatus") or "unknown"
+    confirmed = lineup_status.lower() == "confirmed" if isinstance(lineup_status, str) else False
+    
+    return {
+        "date": game_date,
+        "lineup_status": "confirmed" if confirmed else "projected",
+        "games": games,
+        "total_games": len(games)
+    }
+
+def get_player_props(player_name: str) -> dict[str, Any]:
+    """
+    Get player props from The Odds API. 
+    Retrieves points, rebounds, and assist O/U lines for a given player for different betting platforms. 
+    https://api.sportsgameodds.com/v2/events?apiKey=API_KEY_HERE&leagueID=NBA&oddsAvailable=true&oddIDs=points-PLAYER_ID-game-ou-over,points-PLAYER_ID-game-ou-under
+    """
+    player_entity_id = "_".join(player_name.split(" ")).upper() + "_1_NBA"
+
+    def get_stat_odds(stat: str) -> dict[str, Any]:
+        if stat == "points":
+            url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs=points-{player_entity_id}-game-ou-over,points-{player_entity_id}-game-ou-under"
+        elif stat == "rebounds":
+            url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs=rebounds-{player_entity_id}-game-ou-over,rebounds-{player_entity_id}-game-ou-under"
+        elif stat == "assists":
+            url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs=assists-{player_entity_id}-game-ou-over,assists-{player_entity_id}-game-ou-under"
+        else:
+            raise ValueError(f"Invalid stat: {stat}")
+        response = requests.get(url)
+        data = response.json()
+        return data["data"][0]["odds"]
+
+    payload = {}
+    for stat in ["points", "rebounds", "assists"]:
+        data = get_stat_odds(stat)
+        # rebounds-JALEN_DUREN_1_NBA-game-ou-over
+        over_key = f"{stat}-{player_entity_id}-game-ou-over"
+        under_key = f"{stat}-{player_entity_id}-game-ou-under"
+
+        def get_prop_odds(prop_json: dict) -> dict[str, Any]:
+            ret = {}
+            for bookmaker, odds in prop_json.items():
+                ret[bookmaker] = {
+                    "odds": odds["odds"],
+                    "line": odds["overUnder"],
+                }
+            return ret
+
+        over_prop_odds = get_prop_odds(data[over_key]["byBookmaker"])
+        under_prop_odds = get_prop_odds(data[under_key]["byBookmaker"])
+
+        payload[stat] = {
+            "over": over_prop_odds,
+            "under": under_prop_odds,
+        }
+
+    return payload
+
+
+# --- Standings and games helpers (used by main.py routes) ---
+
+def _parse_l10(l10_str: str) -> tuple[int, int]:
+    """Parse L10 string like '7-3' or '4-6' into (wins, losses). Returns (0, 0) on failure."""
+    if not l10_str or "-" not in l10_str:
+        return 0, 0
+    parts = l10_str.strip().split("-")
+    if len(parts) != 2:
+        return 0, 0
+    try:
+        return int(parts[0].strip()), int(parts[1].strip())
+    except ValueError:
+        return 0, 0
+
+
+def _current_nba_season() -> str:
+    """e.g. Oct 2025 -> '2025-26'; July 2025 -> '2025-26'."""
+    today = date.today()
+    year = today.year
+    if today.month >= 10:
+        return f"{year}-{str(year + 1)[-2:]}"
+    return f"{year - 1}-{str(year)[-2:]}"
+
+
+def _to_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _to_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _format_streak(raw: str) -> str:
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    if " " in s:
+        return s
+    if len(s) >= 2 and s[0] in ("W", "L") and s[1:].isdigit():
+        return f"{s[0]} {s[1:]}"
+    return s
+
+
+def _normalize_espn_entries(entries: list[dict[str, Any]], conference: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for idx, entry in enumerate(entries, start=1):
+        team = entry.get("team") or {}
+        stats = entry.get("stats") or []
+        stats_map: dict[str, Any] = {}
+        for stat in stats:
+            key = stat.get("name") or stat.get("abbreviation")
+            if not key:
+                continue
+            stats_map[key] = stat.get("displayValue") if stat.get("displayValue") is not None else stat.get("value")
+
+        wins = _to_int(stats_map.get("wins"))
+        losses = _to_int(stats_map.get("losses"))
+        rank = _to_int(stats_map.get("playoffSeed"), default=idx)
+
+        out.append(
+            {
+                "team_id": _to_int(team.get("id")),
+                "team_city": team.get("location") or team.get("name") or "",
+                "team_name": team.get("name") or team.get("displayName") or "",
+                "team_abbreviation": team.get("abbreviation") or "",
+                "conference": conference,
+                "rank": rank,
+                "record": stats_map.get("summary") or f"{wins}-{losses}",
+                "win_pct": _to_float(stats_map.get("winPercent")),
+                "team_L10": stats_map.get("Last Ten Games") or "",
+                "curr_streak": _format_streak(str(stats_map.get("streak") or "")),
+            }
+        )
+    out.sort(key=lambda team: team.get("rank", 999))
+    return out
+
+
+def fetch_standings_from_espn() -> list[dict[str, Any]]:
+    """
+    Fetch league standings from ESPN. Returns [{"east_standings": [...], "west_standings": [...]}].
+    Uses cache on upstream failure. Raises Exception on final failure (caller may map to HTTPException).
+    """
+    global _STANDINGS_CACHE, _STANDINGS_CACHE_AT
+
+    last_error: Exception | None = None
+    for attempt in range(1, _ESPN_STANDINGS_RETRIES + 1):
+        try:
+            resp = requests.get(_ESPN_STANDINGS_URL, timeout=_ESPN_STANDINGS_TIMEOUT)
+            resp.raise_for_status()
+            raw = resp.json()
+
+            east: list[dict[str, Any]] = []
+            west: list[dict[str, Any]] = []
+
+            for child in raw.get("children") or []:
+                conf_name = (child.get("abbreviation") or child.get("name") or "").lower()
+                standings_block = child.get("standings") or {}
+                entries = standings_block.get("entries") or child.get("entries") or []
+                if "east" in conf_name:
+                    east = _normalize_espn_entries(entries, "East")
+                elif "west" in conf_name:
+                    west = _normalize_espn_entries(entries, "West")
+
+            if not east and not west:
+                raise ValueError("ESPN standings payload missing east/west entries")
+
+            result = [{"east_standings": east, "west_standings": west}]
+            _STANDINGS_CACHE = result
+            _STANDINGS_CACHE_AT = datetime.utcnow()
+            return result
+        except Exception as e:
+            last_error = e
+            print(f"ESPN standings fetch failed (attempt {attempt}/{_ESPN_STANDINGS_RETRIES}): {e}")
+            if attempt < _ESPN_STANDINGS_RETRIES:
+                time.sleep(attempt)
+
+    if _STANDINGS_CACHE is not None:
+        cache_age = "unknown"
+        if _STANDINGS_CACHE_AT is not None:
+            cache_age = f"{int((datetime.utcnow() - _STANDINGS_CACHE_AT).total_seconds())}s"
+        print(f"Serving cached standings after upstream failure (cache age: {cache_age}).")
+        return _STANDINGS_CACHE
+
+    raise Exception(f"Failed to fetch standings from ESPN: {last_error}")
+
+
+def _l10_by_abbrev_from_espn_standings() -> dict[str, tuple[int, int]]:
+    """
+    Build mapping abbreviation -> (l10_wins, l10_losses) from fetch_standings_from_espn().
+    Uses team_id from standings + _NBA_TEAM_ID_TO_ABBREV (ESPN uses same team IDs as NBA).
+    """
+    abbrev_to_l10: dict[str, tuple[int, int]] = {}
+    data = fetch_standings_from_espn()
+    block = data[0] if data else {}
+    east = block.get("east_standings") or []
+    west = block.get("west_standings") or []
+    for entry in east + west:
+        team_id = entry.get("team_id")
+        l10_str = (entry.get("team_L10") or "").strip()
+        w, l = _parse_l10(l10_str)
+        abbrev = _NBA_TEAM_ID_TO_ABBREV.get(team_id)
+        if abbrev:
+            abbrev_to_l10[abbrev] = (w, l)
+    if "UTA" in abbrev_to_l10:
+        abbrev_to_l10["UTAH"] = abbrev_to_l10["UTA"]
+    return abbrev_to_l10
+
+
+def fetch_games_from_nba() -> list[dict[str, Any]]:
+    """
+    Fetch full game data from ESPN API with all stats.
+    Used by /api/games/stats endpoint for detailed statistics.
+    """
+    url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    resp = requests.get(url, timeout=10)
+    resp.raise_for_status()
+    raw = resp.json()
+    events = raw.get("events", [])
+    result = []
+    l10_by_abbrev = _l10_by_abbrev_from_espn_standings() # switched to ESPN to avoid slow game details load time
+    for event in events:
+        payload = parse_game_data(event)
+        if payload:
+            home_abbrev = payload.get("home_abbreviation", "") or ""
+            away_abbrev = payload.get("away_abbreviation", "") or ""
+            h_w, h_l = l10_by_abbrev.get(home_abbrev, (0, 0))
+            a_w, a_l = l10_by_abbrev.get(away_abbrev, (0, 0))
+            payload["home_l10_wins"] = h_w
+            payload["away_l10_wins"] = a_w
+            result.append(payload)
+    return result
+
+
+def fetch_dashboard_games() -> list[dict[str, Any]]:
+    """
+    Fetch lightweight game data from ESPN API for dashboard display.
+    Returns only: game_id, status, team names/abbr, records, scores.
+    Used by /api/games endpoint.
+    """
+    url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    resp = requests.get(url, timeout=10)
+    resp.raise_for_status()
+    raw = resp.json()
+    events = raw.get("events", [])
+    result = []
+    for event in events:
+        payload = parse_dashboard_game_data(event)
+        if payload:
+            result.append(payload)
+    return result

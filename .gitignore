@@ -210,6 +210,11 @@ frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/.pnpm-debug.log*
+frontend/playwright-report/
+frontend/test-results/
 
-#ml
+# ml
 ml/datasets/
+
+# local / scratch tests (do not push)
+backend/random_tests/

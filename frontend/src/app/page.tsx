@@ -11,10 +11,10 @@ export default function GamesPage() {
   const displayGames = games.length ? games : mockGames;
 
   return (
-    <main className="min-h-screen bg-zinc-50 p-6 pt-20">
+    <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 p-6 pt-20">
       <div className="mx-auto max-w-7xl">
         <h1 className="text-2xl font-semibold text-emerald-400">Live Games</h1>
-        <p className="mt-1 text-zinc-600">
+        <p className="mt-1 text-zinc-600 dark:text-zinc-300">
           Check out today&apos;s games and predictions
         </p>
 
@@ -33,7 +33,7 @@ export default function GamesPage() {
           </div>
         </div>
 
-        <div className="mt-6 text-sm text-zinc-500">
+        <div className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">
           Status: {status}
           {error ? ` • ${error}` : null}
         </div>
