@@ -12,7 +12,7 @@ from util import (
     parse_game_data,
     parse_dashboard_game_data,
     merge_gp,
-    parse_lineup_data,
+    fetch_espn_lineups,
     fetch_standings_from_espn,
     fetch_games_from_nba,
     fetch_dashboard_games,
@@ -305,7 +305,7 @@ def standings():
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-# Starting Lineups Route
+# Starting Lineups Route (ESPN-sourced)
 @app.get("/api/v1/lineups/{game_date}")
 def get_lineups(game_date: str):
     # Validate date format
@@ -315,46 +315,12 @@ def get_lineups(game_date: str):
             "date": game_date,
             "games": []
         }
-    
-    # Construct URL for NBA stats endpoint
-    url = f"https://stats.nba.com/js/data/leaders/00_daily_lineups_{game_date}.json"
-    
-    # Required headers to bypass 403 Forbidden
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.nba.com/",
-        "Origin": "https://www.nba.com",
-        "Connection": "keep-alive",
-    }
-    
+
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        raw_data = resp.json()
-        
-        # Parse and structure the response
-        structured_lineups = parse_lineup_data(raw_data, game_date)
-        return structured_lineups
-        
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            # Lineups not available yet for this date
-            return {
-                "date": game_date,
-                "message": "Starting lineups not yet available for this date. Lineups are typically posted ~30 minutes before tipoff.",
-                "games": []
-            }
-        else:
-            return {
-                "error": f"HTTP {e.response.status_code}: {str(e)}",
-                "date": game_date,
-                "games": []
-            }
+        return fetch_espn_lineups(game_date)
     except requests.exceptions.Timeout:
         return {
-            "error": "Request timeout. NBA stats server may be slow or unavailable.",
+            "error": "Request timeout. ESPN may be slow or unavailable.",
             "date": game_date,
             "games": []
         }

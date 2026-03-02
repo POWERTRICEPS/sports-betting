@@ -416,81 +416,138 @@ def parse_dashboard_game_data(event: dict[str, Any]) -> dict[str, Any] | None:
         "away_score": a["score"],
     }
 
-def parse_lineup_data(raw_data: dict, game_date: str) -> dict:
+def fetch_espn_lineups(game_date: str) -> dict[str, Any]:
     """
-    Parse raw NBA lineup data into structured format.
-    
+    Fetch starting lineup data from the ESPN API for a given date.
+
+    Uses the ESPN scoreboard to discover game IDs, then the ESPN game
+    summary endpoint to pull starters (``boxscore.players``).  Starters
+    are only available once ESPN publishes them (typically after tip-off),
+    so pre-game responses will still list the matchups but with empty
+    starter arrays and ``lineup_status: "not_available"``.
+
     Args:
-        raw_data: Raw JSON from NBA stats endpoint
-        game_date: Date string (YYYYMMDD)
-    
+        game_date: Date string in ``YYYYMMDD`` format (e.g. ``"20260301"``).
+
     Returns:
-        Structured lineup data matching acceptance criteria
-    """
-    games = []
-    
-    # Extract teams data from raw response
-    # NBA's structure may vary, so we handle multiple possible formats
-    teams_data = raw_data.get("teams", []) or raw_data.get("resultSets", [])
-    
-    if isinstance(teams_data, list) and len(teams_data) > 0:
-        # Group teams by game
-        games_dict = {}
-        
-        for team_data in teams_data:
-            # Extract team information
-            team_info = {
-                "team_name": team_data.get("team_name") or team_data.get("teamName") or "",
-                "team_abbreviation": team_data.get("team_abbreviation") or team_data.get("teamTricode") or team_data.get("abbr") or "",
-                "starters": []
+        A standardised dict::
+
+            {
+                "date": "20260301",
+                "lineup_status": "confirmed" | "not_available",
+                "games": [ … ],
+                "total_games": int,
             }
-            
-            # Extract starters (usually 5 players)
-            starters_data = team_data.get("starters", []) or team_data.get("players", [])
-            
-            for player in starters_data[:5]:  # Ensure only 5 starters
-                starter = {
-                    "name": player.get("player_name") or player.get("playerName") or player.get("name") or "Unknown",
-                    "position": player.get("position") or player.get("pos") or "",
-                    "player_id": str(player.get("player_id") or player.get("playerId") or player.get("id") or "")
-                }
-                team_info["starters"].append(starter)
-            
-            # Try to extract game_id and group by matchup
-            game_id = team_data.get("game_id") or team_data.get("gameId") or ""
-            
-            if game_id:
-                if game_id not in games_dict:
-                    games_dict[game_id] = {
-                        "game_id": game_id,
-                        "home_team": None,
-                        "away_team": None
-                    }
-                
-                # Determine if home or away (based on indicator in data)
-                is_home = team_data.get("home_away") == "home" or team_data.get("isHome") == True
-                
-                if is_home:
-                    games_dict[game_id]["home_team"] = team_info
-                else:
-                    games_dict[game_id]["away_team"] = team_info
-        
-        # Convert dict to list and filter out incomplete games
-        games = [
-            game for game in games_dict.values() 
-            if game["home_team"] and game["away_team"]
-        ]
-    
-    # Check for confirmed lineups status
-    lineup_status = raw_data.get("LINEUP_STATUS") or raw_data.get("lineupStatus") or "unknown"
-    confirmed = lineup_status.lower() == "confirmed" if isinstance(lineup_status, str) else False
-    
+
+        Each game entry contains ``game_id``, ``home_team``, and
+        ``away_team`` with ``team_name``, ``team_abbreviation``, and
+        ``starters`` (list of up to 5 players with ``name``, ``position``,
+        ``player_id``).
+    """
+    _ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    _ESPN_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+    _TIMEOUT = 10
+
+    # ── 1. Discover games for the requested date ──────────────────────
+    resp = requests.get(_ESPN_SCOREBOARD_URL, params={"dates": game_date}, timeout=_TIMEOUT)
+    resp.raise_for_status()
+    events = resp.json().get("events", [])
+
+    if not events:
+        return {
+            "date": game_date,
+            "lineup_status": "not_available",
+            "message": "No games found for this date.",
+            "games": [],
+            "total_games": 0,
+        }
+
+    # ── 2. For each game, fetch the summary and extract starters ──────
+    games: list[dict[str, Any]] = []
+    any_starters_found = False
+
+    for event in events:
+        game_id = event.get("id", "")
+        competition = (event.get("competitions") or [{}])[0]
+
+        # Build team shells from the scoreboard (always available)
+        team_map: dict[str, dict[str, Any]] = {}  # homeAway -> team info
+        for competitor in competition.get("competitors", []):
+            side = competitor.get("homeAway", "")
+            team = competitor.get("team", {})
+            team_map[side] = {
+                "team_name": team.get("displayName", ""),
+                "team_abbreviation": team.get("abbreviation", ""),
+                "starters": [],
+            }
+
+        # Fetch the game summary for starter data
+        try:
+            summary_resp = requests.get(
+                _ESPN_SUMMARY_URL,
+                params={"event": game_id},
+                timeout=_TIMEOUT,
+            )
+            summary_resp.raise_for_status()
+            summary = summary_resp.json()
+
+            boxscore_players = summary.get("boxscore", {}).get("players", [])
+            for player_group in boxscore_players:
+                group_team = player_group.get("team", {})
+                abbrev = group_team.get("abbreviation", "")
+
+                # Match this player group to home or away
+                side = None
+                for s, info in team_map.items():
+                    if info["team_abbreviation"] == abbrev:
+                        side = s
+                        break
+                if side is None:
+                    continue
+
+                statistics = player_group.get("statistics", [])
+                if not statistics:
+                    continue
+
+                athletes = statistics[0].get("athletes", [])
+                starters = [a for a in athletes if a.get("starter")]
+                for starter in starters[:5]:
+                    athlete = starter.get("athlete", {})
+                    position = athlete.get("position", {})
+                    team_map[side]["starters"].append({
+                        "name": athlete.get("displayName", "Unknown"),
+                        "position": position.get("abbreviation", ""),
+                        "player_id": str(athlete.get("id", "")),
+                    })
+                if starters:
+                    any_starters_found = True
+
+        except Exception as e:
+            print(f"[fetch_espn_lineups] summary fetch failed for game {game_id}: {e}")
+
+        games.append({
+            "game_id": game_id,
+            "home_team": team_map.get("home"),
+            "away_team": team_map.get("away"),
+        })
+
     return {
         "date": game_date,
-        "lineup_status": "confirmed" if confirmed else "projected",
+        "lineup_status": "confirmed" if any_starters_found else "not_available",
         "games": games,
-        "total_games": len(games)
+        "total_games": len(games),
+        **(
+            {"message": "Starting lineups not yet available. Lineups are typically posted around tip-off."}
+            if not any_starters_found
+            else {}
+        ),
     }
+
+
+# Keep old name as a thin alias so nothing else breaks.
+def parse_lineup_data(raw_data: dict, game_date: str) -> dict:  # noqa: ARG001
+    """Deprecated — prefer ``fetch_espn_lineups(game_date)`` instead."""
+    return fetch_espn_lineups(game_date)
 
 def get_player_props(player_name: str) -> dict[str, Any]:
     """
