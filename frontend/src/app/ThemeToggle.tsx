@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import moonSymbol from "./image/moon_symbol.png";
+import sunSymbol from "./image/sun_symbol.png";
 
 type Theme = "light" | "dark" | "system";
 
 function getSystemPrefersDark() {
+  if (typeof window === "undefined") return false;
   return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
 }
 
@@ -15,56 +19,51 @@ function resolveTheme(theme: Theme) {
 
 function applyTheme(theme: Theme) {
   const resolved = resolveTheme(theme);
+  if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("dark", resolved === "dark");
 }
 
 export default function ThemeToggle() {
-  const [mounted, setMounted] = useState(false);
-  const [theme, setTheme] = useState<Theme>("system");
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "system";
+    try {
+      return (localStorage.getItem("theme") as Theme | null) ?? "system";
+    } catch {
+      return "system";
+    }
+  });
 
   useEffect(() => {
-    setMounted(true);
-    try {
-      const stored = (localStorage.getItem("theme") as Theme | null) ?? "system";
-      setTheme(stored);
-      applyTheme(stored);
-    } catch {
-      applyTheme("system");
-    }
+    applyTheme(theme);
+  }, [theme]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
     const onChange = () => {
-      try {
-        const stored = (localStorage.getItem("theme") as Theme | null) ?? "system";
-        if (stored === "system") applyTheme("system");
-      } catch {
+      if (theme === "system") {
         applyTheme("system");
       }
     };
 
     mql?.addEventListener?.("change", onChange);
     return () => mql?.removeEventListener?.("change", onChange);
-  }, []);
+  }, [theme]);
 
   function toggle() {
-    const next: Theme = resolveTheme(theme) === "dark" ? "light" : "dark";
+    const resolved = resolveTheme(theme);
+    const next: Theme = resolved === "dark" ? "light" : "dark";
     setTheme(next);
     try {
       localStorage.setItem("theme", next);
     } catch {
       // ignore
     }
-    applyTheme(next);
   }
 
-  const resolved = mounted ? resolveTheme(theme) : "light";
-  // Label reflects the *next* theme when clicked
-  const label = mounted
-    ? resolved === "dark"
-      ? "Light"
-      : "Dark"
-    : "Theme";
-  const pressed = mounted && resolved === "dark";
+  const resolved = resolveTheme(theme);
+  const pressed = resolved === "dark";
+  const isDark = resolved === "dark";
 
   return (
     <button
@@ -72,9 +71,16 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label="Toggle dark mode"
       aria-pressed={pressed}
-      className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40"
+      className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 flex items-center justify-center"
     >
-      {label} mode
+      <span className="sr-only">Toggle dark mode</span>
+      <Image
+        src={isDark ? moonSymbol : sunSymbol}
+        alt={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        width={24}
+        height={24}
+        className="h-6 w-6"
+      />
     </button>
   );
 }
