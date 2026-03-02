@@ -551,10 +551,14 @@ def parse_lineup_data(raw_data: dict, game_date: str) -> dict:  # noqa: ARG001
 
 def get_player_props(player_name: str) -> dict[str, Any]:
     """
-    Get player props from The Odds API. 
-    Retrieves points, rebounds, and assist O/U lines for a given player for different betting platforms. 
+    Get player props from The Odds API.
+    Retrieves points, rebounds, and assist O/U lines for a given player for different betting platforms.
     https://api.sportsgameodds.com/v2/events?apiKey=API_KEY_HERE&leagueID=NBA&oddsAvailable=true&oddIDs=points-PLAYER_ID-game-ou-over,points-PLAYER_ID-game-ou-under
+
+    Args:
+        player_name: The name of the player to get props for.
     """
+
     player_entity_id = "_".join(player_name.split(" ")).upper() + "_1_NBA"
 
     def get_stat_odds(stat: str) -> dict[str, Any]:
@@ -566,13 +570,19 @@ def get_player_props(player_name: str) -> dict[str, Any]:
             url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs=assists-{player_entity_id}-game-ou-over,assists-{player_entity_id}-game-ou-under"
         else:
             raise ValueError(f"Invalid stat: {stat}")
-        response = requests.get(url)
-        data = response.json()
-        return data["data"][0]["odds"]
+        try:
+            response = requests.get(url)
+            data = response.json()
+            return data["data"][0]["odds"]
+        except Exception as e:
+            print(f"[get_player_props] failed to get {stat} odds for {player_name}: {e}")
+            return {}
 
     payload = {}
     for stat in ["points", "rebounds", "assists"]:
         data = get_stat_odds(stat)
+        if not data:
+            continue
         # rebounds-JALEN_DUREN_1_NBA-game-ou-over
         over_key = f"{stat}-{player_entity_id}-game-ou-over"
         under_key = f"{stat}-{player_entity_id}-game-ou-under"
