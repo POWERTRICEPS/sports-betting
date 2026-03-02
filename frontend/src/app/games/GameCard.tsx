@@ -17,10 +17,12 @@ export default function GameCard({ data }: { data: Game }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
 
-  let pinnedGames = JSON.parse(localStorage.getItem("pinnedGames") || "[]") as string[];
-  useState(() => {
-    setIsPinned(pinnedGames.includes(data.game_id));
-  });
+  if(typeof window !== "undefined") {
+    let pinnedGames = JSON.parse(localStorage.getItem("pinnedGames") || "[]") as string[];
+    useState(() => {
+      setIsPinned(pinnedGames.includes(data.game_id));
+    });
+  }
 
   const homePrimary =
     teamPrimaryColors[data.home_abbreviation] ?? "#1F2937";
