@@ -42,7 +42,7 @@ _STANDINGS_CACHE: list[dict[str, Any]] | None = None
 _STANDINGS_CACHE_AT: datetime | None = None
 import pandas as pd
 
-_ML_MODEL_PATH = Path(__file__).resolve().parent / "pred_models" / "lr.joblib"
+_ML_MODEL_PATH = Path(__file__).resolve().parent / "pred_models" / "wp_lr.joblib"
 _wp_model = None
 _wp_model_load_attempted = False
 
