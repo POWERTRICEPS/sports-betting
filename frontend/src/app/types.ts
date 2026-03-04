@@ -63,3 +63,23 @@ export type ConnectionStatus =
   | "disconnected"
   | "connecting"
   | "error";
+
+// Matches the dictionary structure from backend standings.py
+export interface TeamData {
+  team_id: number;
+  team_city: string;
+  team_name: string;
+  team_abbreviation: string;
+  conference: string;
+  rank: number;
+  record: string;
+  win_pct: number;
+  team_L10: string;
+  curr_streak: string;
+}
+
+// Matches the return signature: List[Dict] -> [{ east_standings: ..., west_standings: ... }]
+export interface StandingsResponse {
+  east_standings: TeamData[];
+  west_standings: TeamData[];
+}

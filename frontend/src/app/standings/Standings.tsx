@@ -1,28 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { teamPrimaryColors, teamSecondaryColors } from "../resources/colors";
-
-// Matches the dictionary structure from standings.py
-interface TeamData {
-  team_id: number;
-  team_city: string;
-  team_name: string;
-  team_abbreviation: string;
-  conference: string;
-  rank: number;
-  record: string;
-  win_pct: number;
-  team_L10: string;
-  curr_streak: string;
-}
-
-// Matches the return signature: List[Dict] -> [{ east_standings: ..., west_standings: ... }]
-interface StandingsResponse {
-  east_standings: TeamData[];
-  west_standings: TeamData[];
-}
+import { useGameData } from "../GameDataProvider";
 
 //make this a jsx element
 function LazyImage({
@@ -62,37 +43,14 @@ function LazyImage({
 }
 
 export default function Standings() {
-  const [data, setData] = useState<StandingsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { standings, standingsLoading } = useGameData();
   const [conference, setConference] = useState<"East" | "West">("East");
-  const [hover, setHover] = useState<boolean>(false);
-
-  useEffect(() => {
-    async function fetchStandings() {
-      try {
-        const res = await fetch(
-          "https://pj09-sports-betting.onrender.com/api/standings",
-        );
-        const json = await res.json();
-        console.log(json);
-
-        // standings.py returns a list containing one dict: [{...}]
-        if (Array.isArray(json) && json.length > 0) {
-          setData(json[0]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch standings:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchStandings();
-  }, []);
 
   // Determine which list to show based on tab selection
   const currentStandings =
-    conference === "East" ? data?.east_standings : data?.west_standings;
+    conference === "East"
+      ? standings?.east_standings
+      : standings?.west_standings;
 
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 h-full flex flex-col">
@@ -128,7 +86,7 @@ export default function Standings() {
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
-        {loading ? (
+        {standingsLoading ? (
           <div className="flex h-40 items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">
             Loading...
           </div>
