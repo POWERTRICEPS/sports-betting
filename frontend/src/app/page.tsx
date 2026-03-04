@@ -8,7 +8,22 @@ import { useGameData } from "./GameDataProvider";
 
 export default function GamesPage() {
   const { games, status, error } = useGameData();
-  const displayGames = games.length ? games : mockGames;
+  let displayGames = games.length ? games : mockGames;
+
+  if(typeof window !== "undefined") {
+    let pinnedGames = JSON.parse(localStorage.getItem("pinnedGames") || "[]") as string[];
+    if(!displayGames.map(g => g.game_id).includes(pinnedGames[0])) {
+      pinnedGames = [];
+      localStorage.setItem("pinnedGames", JSON.stringify(pinnedGames));
+    }
+    displayGames.sort((a, b) => {
+      const aPinned = pinnedGames.includes(a.game_id);
+      const bPinned = pinnedGames.includes(b.game_id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
+  }
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 p-6 pt-20">
@@ -23,7 +38,6 @@ export default function GamesPage() {
           <div className="col-span-4 grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             {displayGames.map((game) => (
               <GameCard key={game.game_id} data={game} />
-              
             ))}
           </div>
 
