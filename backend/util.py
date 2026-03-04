@@ -16,6 +16,8 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from dotenv import load_dotenv
+load_dotenv()
 
 import requests
 
@@ -568,11 +570,15 @@ def get_player_props(player_name: str) -> dict[str, Any]:
             raise ValueError(f"Invalid stat: {stat}")
         response = requests.get(url)
         data = response.json()
+        if "data" not in data or len(data["data"]) == 0:
+            return None
         return data["data"][0]["odds"]
 
     payload = {}
     for stat in ["points", "rebounds", "assists"]:
         data = get_stat_odds(stat)
+        if data is None:
+            continue
         # rebounds-JALEN_DUREN_1_NBA-game-ou-over
         over_key = f"{stat}-{player_entity_id}-game-ou-over"
         under_key = f"{stat}-{player_entity_id}-game-ou-under"
