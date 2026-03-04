@@ -19,6 +19,7 @@ from util import (
     get_player_props,
 )
 import state as app_state
+from database import fetch_game_history, save_completed_games_to_db
 
 async def update_games_and_probabilities():
     """
@@ -41,6 +42,9 @@ async def update_games_and_probabilities():
     )
     # Broadcast to games dashboard
     await manager.broadcast_to_topic("games", result)
+
+    # Persist any completed games to the database
+    await save_completed_games_to_db(result)
 
     """
     # Broadcast to singel gameID (todo: remove and create separate function to send per game stats needed)
@@ -331,6 +335,34 @@ def get_lineups(game_date: str):
             "date": game_date,
             "games": []
         }
+
+# Game History Route (from database)
+@app.get("/api/games/history")
+async def game_history(
+    order: str = "desc",
+    limit: int | None = None,
+    date: str | None = None,
+):
+    """
+    Returns past game results from the database, sorted by date.
+
+    Query params:
+        order: 'desc' (newest first, default) or 'asc' (oldest first)
+        limit: max number of results (optional)
+        date:  'YYYY-MM-DD' — return only games on this date (optional)
+    """
+    try:
+        days = await fetch_game_history(order=order, limit=limit, date=date)
+        total_games = sum(len(d["games"]) for d in days)
+        return {
+            "total_days": len(days),
+            "total_games": total_games,
+            "order": order,
+            "days": days,
+        }
+    except Exception as e:
+        print(f"Error fetching game history: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
 
 # Endpoint for specific game using game_id
 @app.get("/api/games/stats/{game_id}")
