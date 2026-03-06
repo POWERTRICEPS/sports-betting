@@ -14,7 +14,7 @@
 | Mon 2/9   | Ali Shahid    | Led Daily Scrum                       |
 | Wed 2/11  | Kevin Yang    | Led Daily Scrum                       |
 | Fri 2/13  | Jun Yoon      | Led Retro                             |
-
+| Fri 3/6 | Jay Yeung | Led Final Retro |
 
 
 # Assigned Roles
