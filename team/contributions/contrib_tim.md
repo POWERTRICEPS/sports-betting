@@ -1,17 +1,22 @@
-# Timothy Nguyen – Contribution Summary
+# Contributions - Tim
 
-Throughout the quarter I held a retro and scrum meetings breifly as scribe. I contributed primarily to the frontend development and real-time data integration for the sports probability application. My work focused on implementing live game updates using WebSockets, building UI components to display game information, and creating a probability visualization chart for live games. 
+I contributed primarily to frontend development and real-time data integration for the sports probability application. My work focused on implementing live game updates, probability visualization, and UI components for displaying game and player data. Throughout the quarter I lead a retro and some scrum meetings as scribe. 
 
 ## Feature Development
-- Implemented **real-time NBA game updates using WebSockets** in `socket.js`, `socket.ts`, enabling the frontend to receive live game data from the backend.
-- Connected the **frontend socket to the backend WebSocket server** to support live updates for games.
-- Created the **Game Probability Win Chart** component, changes were made in `GameProbabilityChart.jsx` and `GameProbabilityChart.tsx` to visualize win probability changes during a game.
+- Implemented **real-time NBA game updates using WebSockets** in the frontend, enabling the client to receive live game data from the backend.  
+  PRs: https://github.com/ucsb-cs148-w26/pj09-sports-betting/issues/60
 
-## Frontend & UI Development
-- Implemented the **GameCard component**, `GameCard.jsx`,  `GameCard.tsx` to display live game information.
-- Wired **live game data into the GameCard UI** so updates from the backend appear in real time.
-- Refactored the **GamesPage component** `GamesPage.jsx`, `GamesPage.tsx` to use the GameCard component and structured game data for display.
-- Updated frontend API configuration to use **Render backend URLs** for game data and WebSocket connections.
+- Created a **win probability graph for live games** to visualize probability changes throughout the game.  
+  PRs: https://github.com/ucsb-cs148-w26/pj09-sports-betting/issues/68
 
-## Additional Contributions
-- Added project documentation such as `AI_CODING.md` and `TESTING.md`, and participated in team coordination tasks including retrospectives and scrum notes.
+- Optimized **game statistics loading on the game page** to improve performance and reduce load time.  
+  PRs: https://github.com/ucsb-cs148-w26/pj09-sports-betting/issues/159
+
+- Implemented **GameCard UI components and wired live game data into the interface** so updates appear in real time.
+
+- Implemented **player props UI components and rendered them on the props page**.  
+  PRs: https://github.com/ucsb-cs148-w26/pj09-sports-betting/issues/113
+
+- Fixed **game fetching in the production environment**, updating frontend API endpoints to correctly retrieve deployed backend data.  
+  PRs: https://github.com/ucsb-cs148-w26/pj09-sports-betting/issues/116
+  
