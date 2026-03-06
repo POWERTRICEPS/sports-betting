@@ -1,4 +1,4 @@
-# Contribution - Logan
+# Contributions - Logan
 
 ## Leadership/Planning
 
