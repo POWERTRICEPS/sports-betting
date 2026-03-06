@@ -15,3 +15,4 @@ Throughout the quart I worked on mutliple issues and features. Most issues were 
 - Redesigned Web Socket to support multiple subjects. PR: [143](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/143)
 - Adding e2e test to the frontend. PR: [164](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/164)
 - Designed a data pipeline for live playerprop predicition. PR:[]()
+- Small bug fixes. PRs: [48](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/48) [100](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/100) [115](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/100) [149](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/149)
