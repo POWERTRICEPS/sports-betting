@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "a1.espncdn.com",
       },
+      {
+        protocol: "https",
+        hostname: "a.espncdn.com",
+      },
     ],
   },
 };

@@ -1,5 +1,6 @@
 export const mockProps = [
   {
+    espnPlayerId: "3975",
     player: "Stephen Curry",
     team: "GSW",
     opponent: "LAL",
@@ -8,6 +9,7 @@ export const mockProps = [
     game: { teamScore: 94, oppScore: 99, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "6475",
     player: "Klay Thompson",
     team: "GSW",
     opponent: "LAL",
@@ -16,6 +18,7 @@ export const mockProps = [
     game: { teamScore: 94, oppScore: 99, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "6589",
     player: "Draymond Green",
     team: "GSW",
     opponent: "LAL",
@@ -24,6 +27,7 @@ export const mockProps = [
     game: { teamScore: 94, oppScore: 99, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "3059319",
     player: "Andrew Wiggins",
     team: "GSW",
     opponent: "LAL",
@@ -32,6 +36,7 @@ export const mockProps = [
     game: { teamScore: 94, oppScore: 99, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "2779",
     player: "Chris Paul",
     team: "GSW",
     opponent: "LAL",
@@ -40,6 +45,7 @@ export const mockProps = [
     game: { teamScore: 94, oppScore: 99, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "1966",
     player: "LeBron James",
     team: "LAL",
     opponent: "GSW",
@@ -48,6 +54,7 @@ export const mockProps = [
     game: { teamScore: 99, oppScore: 94, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "6583",
     player: "Anthony Davis",
     team: "LAL",
     opponent: "GSW",
@@ -56,6 +63,7 @@ export const mockProps = [
     game: { teamScore: 99, oppScore: 94, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "3136776",
     player: "D'Angelo Russell",
     team: "LAL",
     opponent: "GSW",
@@ -64,6 +72,7 @@ export const mockProps = [
     game: { teamScore: 99, oppScore: 94, quarter: "3rd", clock: "9:41" },
   },
   {
+    espnPlayerId: "4066457",
     player: "Austin Reaves",
     team: "LAL",
     opponent: "GSW",
