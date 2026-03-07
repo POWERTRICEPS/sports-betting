@@ -158,7 +158,7 @@ def calculate(
         period = 1
         seconds_remaining = 48 * 60  # 48 minutes = 2880 seconds
         point_diff = 0
-    elif status == "Final":
+    elif "Final" in status:
         home_win_prob = 0.0 if home_score < away_score else 100.0
         away_win_prob = 100.0 - home_win_prob
         return home_win_prob, away_win_prob
