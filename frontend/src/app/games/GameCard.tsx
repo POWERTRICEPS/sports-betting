@@ -35,8 +35,8 @@ export default function GameCard({ data }: { data: Game }) {
       className="relative block border border-gray-300 dark:border-zinc-700 rounded-lg p-6 shadow-md hover:shadow-lg transform transition-all duration-200 hover:scale-105 cursor-pointer"
       style={{
         background: `
-          radial-gradient(ellipse 120% 100% at 0% 0%, ${homePrimary}65, transparent 65%),
-          radial-gradient(ellipse 120% 100% at 100% 0%, ${awayPrimary}65, transparent 65%)
+          radial-gradient(ellipse 120% 100% at 0% 0%, ${awayPrimary}65, transparent 65%),
+          radial-gradient(ellipse 120% 100% at 100% 0%, ${homePrimary}65, transparent 65%)
         `,
         ...(isHovered && {
           boxShadow:
@@ -81,6 +81,30 @@ export default function GameCard({ data }: { data: Game }) {
 
       {/* Teams and Scores */}
       <div className="flex justify-between items-center mb-4">
+        {/* Away Team */}
+        <div className="flex-1 text-center">
+          <Image
+            src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${data.away_abbreviation}.png&h=456&w=456`}
+            alt={`${data.away_team} logo`}
+            width={imgSize}
+            height={imgSize}
+            className="mx-auto"
+            loading="lazy"
+          />
+          <h3 className="font-bold text-lg">{data.away_team}</h3>
+          <p className="text-sm text-gray-600 dark:text-zinc-300">
+            {data.away_wins}-{data.away_losses}
+          </p>
+          <p className="text-3xl font-bold text-red-500 dark:text-red-400 mt-2">
+            {data.away_score ?? "-"}
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div className="px-4 text-gray-300 dark:text-zinc-500 text-2xl">
+          @
+        </div>
+
         {/* Home Team */}
         <div className="flex-1 text-center">
           <div className="flex-1 justify-center mb-2">
@@ -100,30 +124,6 @@ export default function GameCard({ data }: { data: Game }) {
             {data.home_score ?? "-"}
           </p>
         </div>
-
-        {/* Divider */}
-        <div className="px-4 text-gray-300 dark:text-zinc-500 text-2xl">
-          vs
-        </div>
-
-        {/* Away Team */}
-        <div className="flex-1 text-center">
-          <Image
-            src={`https://a1.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/scoreboard/${data.away_abbreviation}.png&h=456&w=456`}
-            alt={`${data.away_team} logo`}
-            width={imgSize}
-            height={imgSize}
-            className="mx-auto"
-            loading="lazy"
-          />
-          <h3 className="font-bold text-lg">{data.away_team}</h3>
-          <p className="text-sm text-gray-600 dark:text-zinc-300">
-            {data.away_wins}-{data.away_losses}
-          </p>
-          <p className="text-3xl font-bold text-red-500 dark:text-red-400 mt-2">
-            {data.away_score ?? "-"}
-          </p>
-        </div>
       </div>
 
       {/* Win Probability */}
@@ -131,7 +131,7 @@ export default function GameCard({ data }: { data: Game }) {
         <div className="flex justify-between items-center">
           <span className="text-gray-700 dark:text-zinc-200 font-medium">Win Prob:</span>
           <span className="font-bold text-lg text-green-600 dark:text-emerald-400">
-            {formatProb(data.home_win_prob ?? null)} / {formatProb(data.away_win_prob ?? null)}
+            {formatProb(data.away_win_prob ?? null)} / {formatProb(data.home_win_prob ?? null)}
           </span>
         </div>
       </div>
