@@ -603,6 +603,7 @@ def get_player_props(player_name: str) -> dict[str, Any]:
 
     try:
         _wait_sportsgameodds_rate_limit()
+        print(url)
         response = requests.get(url)
         _record_sportsgameodds_request()
         data = response.json()
