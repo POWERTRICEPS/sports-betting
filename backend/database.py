@@ -159,6 +159,29 @@ def _fetch_game_history_sync(
     return [{"date": date, "games": games} for date, games in grouped.items()]
 
 
+def past_game_row_to_dashboard_game(row: dict) -> dict:
+    """
+    Map a past_game_info row to the dashboard game shape expected by merge_gp and the frontend.
+    """
+    gid = str(row["past_game_id"])
+    return {
+        "game_id": gid,
+        "status": "Final",
+        "home_team": row.get("home_team", ""),
+        "home_city": row.get("game_stadium") or "",
+        "home_abbreviation": "",
+        "home_wins": 0,
+        "home_losses": 0,
+        "home_score": int(row.get("home_team_score") or 0),
+        "away_team": row.get("away_team", ""),
+        "away_city": "",
+        "away_abbreviation": "",
+        "away_wins": 0,
+        "away_losses": 0,
+        "away_score": int(row.get("away_team_score") or 0),
+    }
+
+
 async def fetch_game_history(
     order: str = "desc",
     limit: int | None = None,

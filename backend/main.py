@@ -22,7 +22,12 @@ from util import (
 
 )
 import state as app_state
-from database import fetch_game_history, save_completed_games_to_db
+from datetime import date as date_type, datetime
+from database import (
+    fetch_game_history,
+    save_completed_games_to_db,
+    past_game_row_to_dashboard_game,
+)
 
 async def update_games_and_probabilities():
     """
@@ -48,21 +53,6 @@ async def update_games_and_probabilities():
 
     # Persist any completed games to the database
     await save_completed_games_to_db(result)
-
-    """
-    # Broadcast to singel gameID (todo: remove and create separate function to send per game stats needed)
-    for game in result:
-        game_id = game.get("game_id")
-        if game_id:
-            topic = f"game:{game_id}"
-            topic_targets = manager.topic_connection_labels(topic)
-            if topic_targets:
-                print(
-                    f"[broadcast] topic={topic} payload=GameWithProbability "
-                    f"subscribers={len(topic_targets)} targets={topic_targets}"
-                )
-            await manager.broadcast_to_topic(topic, game)
-    """
 
 async def update_subscribed_game_stats():
     """
@@ -295,22 +285,56 @@ def games():
     
     return merge_gp(g, p)
 
+def _parse_date_param(value: str) -> date_type | None:
+    """Parse date path param; accept YYYY-MM-DD or YYYYMMDD. Returns date or None."""
+    if not value or not value.strip():
+        return None
+    value = value.strip()
+    for fmt in ("%Y-%m-%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
 @app.get("/api/games/{date}")
-def games(date: str):
+async def games_by_date(date: str):
     """
-    Returns games on date {date} with dashboard-viewable data only:
-    - game_id, status
-    - team names, abbreviations, records (wins/losses)
-    - current scores
-    - win probabilities (if historic, always 100/0)
-    
-    Data is from in-memory store updated every 5s by background poll.
-    Gracefully handles no available games by returning empty list.
+    Returns games on date {date} with dashboard-viewable data only.
+    - If date is today: fetches from ESPN (live/upcoming).
+    - If date is not today: fetches from database (completed games only).
     """
+    print("games_by_date route hit")
     try:
-        g = fetch_dashboard_games(date)
-        p = compute_win_probabilities(g)
-        return merge_gp(g, p)
+        parsed = _parse_date_param(date)
+        if parsed is None:
+            return []
+        is_today = parsed == date_type.today()
+        date_yyyy_mm_dd = parsed.isoformat()
+
+        if is_today:
+            print("fetching dashboard games for today")
+            g = fetch_dashboard_games()
+            p = compute_win_probabilities(g)
+            return merge_gp(g, p)
+        else:
+            print("fetching game history for date: ", date_yyyy_mm_dd)
+            days = await fetch_game_history(order="asc", date=date_yyyy_mm_dd)
+            print("days: ", days)
+            if not days or not days[0].get("games"):
+                return []
+            rows = days[0]["games"]
+            g = [past_game_row_to_dashboard_game(row) for row in rows]
+            p = {
+                str(row["past_game_id"]): {
+                    "home_win_prob": float(row.get("home_win_probability") or 0),
+                    "away_win_prob": float(row.get("away_win_probability") or 0),
+                }
+                for row in rows
+            }
+            print("merging games and probabilities")
+            return merge_gp(g, p)
     except Exception as e:
         print(f"Error in games by date: {e}")
         return []
