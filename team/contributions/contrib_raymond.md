@@ -13,12 +13,12 @@ Throughout the quart I worked on mutliple issues and features. Most issues were 
 - Create script to clean data for pydantic schema  
   PR: [79](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/85)
 - Refactor /api/games backend route  
-  PR: [114]()
+  PR: [114](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/127)
 - Create basic database schema  
   PR: [63](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/76)
 - Setup FastAPI app  
-  PR: [56]()
+  PR: [56](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/67)
 - Add player images to props  
   PR: [82](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/199)
 - Create player props endpoint + web sockets  
-  PR: [194]()
+  PR: [194](https://github.com/ucsb-cs148-w26/pj09-sports-betting/pull/198)
