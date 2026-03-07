@@ -16,3 +16,9 @@ PROBABILITIES_STATE: dict[str, dict[str, float]] = {}
 # Player props by player name for upcoming days
 # {'player name': {'bookmaker': {'points': {'over_odds': -120, 'under_odds': 100, 'line': 17.5}}}}
 PLAYER_PROPS_STATE: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}   # player name -> bookmaker -> stat -> odds
+
+# Live/mock props snapshot for /api/props and WS topic "props"
+PROPS_SNAPSHOT_STATE: dict[str, Any] = {
+    "updated_at": None,
+    "projections": [],
+}

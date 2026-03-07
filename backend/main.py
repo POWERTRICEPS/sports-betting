@@ -7,6 +7,8 @@ import requests
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from datetime import datetime
+
 from util import (
     compute_win_probabilities,
     parse_game_data,
@@ -16,7 +18,8 @@ from util import (
     fetch_standings_from_espn,
     fetch_games_from_nba,
     fetch_dashboard_games,
-    get_player_props,
+    get_player_props as fetch_player_props,
+
 )
 import state as app_state
 from database import fetch_game_history, save_completed_games_to_db
@@ -225,18 +228,20 @@ manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     dashboard_task = asyncio.create_task(poll_loop())
     detailed_task = asyncio.create_task(detailed_poll_loop())
+    props_task = asyncio.create_task(props_poll_loop())
     try:
         yield
-
     finally:
         dashboard_task.cancel()
         detailed_task.cancel()
+        props_task.cancel()
         try:
             await dashboard_task
             await detailed_task
+            await props_task
         except asyncio.CancelledError:
             pass
-
+        
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -316,7 +321,7 @@ def get_player_props(player_name: str):
     Returns player PTS, REB, and AST props for a given player name.
     Also includes over/under lines from different bookmakers (platforms).
     """
-    return get_player_props(player_name)
+    return fetch_player_props(player_name)
 
 # Standings route
 @app.get("/api/standings")
@@ -414,6 +419,69 @@ def single_game_stats(game_id: str):
     except Exception as e:
         print(f"Error fetching game stats: {e}")
         return {"error": "Failed to fetch game stats"}, 500
+    
+def _build_mock_props_payload() -> dict[str, Any]:
+    return {
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "projections": [
+            {
+                "game_id": "401000001",
+                "player_id": "203999",
+                "player_name": "Nikola Jokic",
+                "team_abbr": "DEN",
+                "opponent_abbr": "LAL",
+                "is_starter": True,
+                "projected_pts": 28.4,
+                "projected_reb": 12.1,
+                "projected_ast": 9.3,
+                "source": "mock",
+            },
+            {
+                "game_id": "401000001",
+                "player_id": "2544",
+                "player_name": "LeBron James",
+                "team_abbr": "LAL",
+                "opponent_abbr": "DEN",
+                "is_starter": True,
+                "projected_pts": 26.7,
+                "projected_reb": 7.8,
+                "projected_ast": 8.0,
+                "source": "mock",
+            },
+        ],
+    }
+
+
+async def update_player_props():
+    """
+    Placeholder updater.
+    """
+    payload = _build_mock_props_payload()
+    app_state.PROPS_SNAPSHOT_STATE.clear()
+    app_state.PROPS_SNAPSHOT_STATE.update(payload)
+
+    await manager.broadcast_to_topic("props", payload)
+
+
+async def props_poll_loop():
+    """Poll/update props every 5 seconds."""
+    while True:
+        try:
+            await update_player_props()
+        except Exception as e:
+            print(f"props poll loop error: {e}")
+        await asyncio.sleep(5)
+
+
+@app.get("/api/props")
+def props():
+    """
+    Returns current props snapshot (mock for now).
+    """
+    if not app_state.PROPS_SNAPSHOT_STATE.get("projections"):
+        app_state.PROPS_SNAPSHOT_STATE.update(_build_mock_props_payload())
+    return app_state.PROPS_SNAPSHOT_STATE
+
   
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

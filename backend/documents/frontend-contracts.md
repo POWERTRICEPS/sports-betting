@@ -192,3 +192,28 @@ export interface PropsSnapshotResponse {
 - Some stats/leader fields may be `null` when source feed omits data.
 - `game_id` is treated as string in responses.
 - `/api/games/stats?game_date=...` is currently non-functional and should not be integrated.
+
+
+## Player Props Contracts
+
+### TypeScript Types
+
+```ts
+export interface PlayerProjection {
+  game_id: string;
+  player_id: string;
+  player_name: string;
+  team_abbr: string;
+  opponent_abbr: string;
+  is_starter: boolean;
+  projected_pts: number;
+  projected_reb: number;
+  projected_ast: number;
+  source: "mock";
+}
+
+export interface PropsSnapshotResponse {
+  updated_at: string | null;
+  projections: PlayerProjection[];
+}
+
