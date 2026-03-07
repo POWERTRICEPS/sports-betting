@@ -7,6 +7,8 @@ import requests
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from datetime import datetime
+
 from util import (
     compute_win_probabilities,
     parse_game_data,
@@ -16,9 +18,11 @@ from util import (
     fetch_standings_from_espn,
     fetch_games_from_nba,
     fetch_dashboard_games,
-    get_player_props,
+    get_player_props as fetch_player_props,
+
 )
 import state as app_state
+from database import fetch_game_history, save_completed_games_to_db
 
 async def update_games_and_probabilities():
     """
@@ -41,6 +45,9 @@ async def update_games_and_probabilities():
     )
     # Broadcast to games dashboard
     await manager.broadcast_to_topic("games", result)
+
+    # Persist any completed games to the database
+    await save_completed_games_to_db(result)
 
     """
     # Broadcast to singel gameID (todo: remove and create separate function to send per game stats needed)
@@ -221,18 +228,20 @@ manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     dashboard_task = asyncio.create_task(poll_loop())
     detailed_task = asyncio.create_task(detailed_poll_loop())
+    props_task = asyncio.create_task(props_poll_loop())
     try:
         yield
-
     finally:
         dashboard_task.cancel()
         detailed_task.cancel()
+        props_task.cancel()
         try:
             await dashboard_task
             await detailed_task
+            await props_task
         except asyncio.CancelledError:
             pass
-
+        
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -285,6 +294,26 @@ def games():
         return []
     
     return merge_gp(g, p)
+
+@app.get("/api/games/{date}")
+def games(date: str):
+    """
+    Returns games on date {date} with dashboard-viewable data only:
+    - game_id, status
+    - team names, abbreviations, records (wins/losses)
+    - current scores
+    - win probabilities (if historic, always 100/0)
+    
+    Data is from in-memory store updated every 5s by background poll.
+    Gracefully handles no available games by returning empty list.
+    """
+    try:
+        g = fetch_dashboard_games(date)
+        p = compute_win_probabilities(g)
+        return merge_gp(g, p)
+    except Exception as e:
+        print(f"Error in games by date: {e}")
+        return []
 
 @app.get("/api/props")
 def get_player_props(game_date: str):
@@ -370,6 +399,34 @@ def get_lineups(game_date: str):
             "games": []
         }
 
+# Game History Route (from database)
+@app.get("/api/games/history")
+async def game_history(
+    order: str = "desc",
+    limit: int | None = None,
+    date: str | None = None,
+):
+    """
+    Returns past game results from the database, sorted by date.
+
+    Query params:
+        order: 'desc' (newest first, default) or 'asc' (oldest first)
+        limit: max number of results (optional)
+        date:  'YYYY-MM-DD' — return only games on this date (optional)
+    """
+    try:
+        days = await fetch_game_history(order=order, limit=limit, date=date)
+        total_games = sum(len(d["games"]) for d in days)
+        return {
+            "total_days": len(days),
+            "total_games": total_games,
+            "order": order,
+            "days": days,
+        }
+    except Exception as e:
+        print(f"Error fetching game history: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+
 # Endpoint for specific game using game_id
 @app.get("/api/games/stats/{game_id}")
 def single_game_stats(game_id: str):
@@ -400,6 +457,69 @@ def single_game_stats(game_id: str):
     except Exception as e:
         print(f"Error fetching game stats: {e}")
         return {"error": "Failed to fetch game stats"}, 500
+    
+def _build_mock_props_payload() -> dict[str, Any]:
+    return {
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "projections": [
+            {
+                "game_id": "401000001",
+                "player_id": "203999",
+                "player_name": "Nikola Jokic",
+                "team_abbr": "DEN",
+                "opponent_abbr": "LAL",
+                "is_starter": True,
+                "projected_pts": 28.4,
+                "projected_reb": 12.1,
+                "projected_ast": 9.3,
+                "source": "mock",
+            },
+            {
+                "game_id": "401000001",
+                "player_id": "2544",
+                "player_name": "LeBron James",
+                "team_abbr": "LAL",
+                "opponent_abbr": "DEN",
+                "is_starter": True,
+                "projected_pts": 26.7,
+                "projected_reb": 7.8,
+                "projected_ast": 8.0,
+                "source": "mock",
+            },
+        ],
+    }
+
+
+async def update_player_props():
+    """
+    Placeholder updater.
+    """
+    payload = _build_mock_props_payload()
+    app_state.PROPS_SNAPSHOT_STATE.clear()
+    app_state.PROPS_SNAPSHOT_STATE.update(payload)
+
+    await manager.broadcast_to_topic("props", payload)
+
+
+async def props_poll_loop():
+    """Poll/update props every 5 seconds."""
+    while True:
+        try:
+            await update_player_props()
+        except Exception as e:
+            print(f"props poll loop error: {e}")
+        await asyncio.sleep(5)
+
+
+@app.get("/api/props")
+def props():
+    """
+    Returns current props snapshot (mock for now).
+    """
+    if not app_state.PROPS_SNAPSHOT_STATE.get("projections"):
+        app_state.PROPS_SNAPSHOT_STATE.update(_build_mock_props_payload())
+    return app_state.PROPS_SNAPSHOT_STATE
+
   
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

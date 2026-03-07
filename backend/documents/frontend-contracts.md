@@ -102,6 +102,11 @@ export type LeagueStandingsResponse = LeagueStandingsItem[];
 ### `GET /api/standings`
 - Response: `LeagueStandingsResponse`
 
+### `GET /api/props`
+- Response: `PropsSnapshotResponse`
+- Current source: mock snapshot updated every 5 seconds by backend poll loop.
+- Future source: same shape backed by live ML projections.
+
 ## WebSocket Contract
 
 ### Endpoint
@@ -110,6 +115,7 @@ export type LeagueStandingsResponse = LeagueStandingsItem[];
 ### Topics
 - `games`: full snapshot stream (`GameWithProbability[]`).
 - `game:<game_id>`: single-game stream (`GameWithProbability`).
+- `props`: player props snapshot stream (`PropsSnapshotResponse`).
 
 ### Client-to-server messages
 - Message type: text frame containing JSON.
@@ -120,6 +126,10 @@ export type LeagueStandingsResponse = LeagueStandingsItem[];
 - Subscribe to one game:
 ```json
 {"action":"subscribe","topic":"game:401706123"}
+```
+- Subscribe to props:
+```json
+{"action":"subscribe","topic":"props"}
 ```
 - Unsubscribe:
 ```json
@@ -136,6 +146,45 @@ export type LeagueStandingsResponse = LeagueStandingsItem[];
 ```
 - `games` topic payload: `GameWithProbability[]`.
 - `game:<game_id>` topic payload: `GameWithProbability`.
+- `props` topic payload: `PropsSnapshotResponse`.
+
+## Player Props Contracts
+
+### TypeScript Types
+
+```ts
+export interface PlayerProjection {
+  game_id: string;
+  player_id: string; // backend primary id (string for transport consistency)
+  espn_player_id: string; // required for frontend headshot rendering
+  player_name: string;
+  team_abbr: string;
+  opponent_abbr: string;
+  is_starter: boolean;
+  projected_pts: number;
+  projected_reb: number;
+  projected_ast: number;
+  source: "mock" | "model";
+}
+
+export interface PropsSnapshotResponse {
+  updated_at: string | null;
+  projections: PlayerProjection[];
+}
+```
+
+### Frontend Mapping Notes
+
+- Frontend props card should map `espn_player_id` to UI field `espnPlayerId`.
+- Headshot URL format:
+  - `https://a.espncdn.com/i/headshots/nba/players/full/{espn_player_id}.png`
+- If `espn_player_id` is missing/invalid, frontend should show fallback initials/avatar.
+
+### Future-Proofing Rules
+
+- Keep `PropsSnapshotResponse` shape stable when switching from mock data to ML model output.
+- Only change `source` from `"mock"` to `"model"` and update numeric projection values.
+- Do not remove `espn_player_id`; this is required for consistent image rendering.
 
 ## Contract Caveats
 
@@ -143,3 +192,28 @@ export type LeagueStandingsResponse = LeagueStandingsItem[];
 - Some stats/leader fields may be `null` when source feed omits data.
 - `game_id` is treated as string in responses.
 - `/api/games/stats?game_date=...` is currently non-functional and should not be integrated.
+
+
+## Player Props Contracts
+
+### TypeScript Types
+
+```ts
+export interface PlayerProjection {
+  game_id: string;
+  player_id: string;
+  player_name: string;
+  team_abbr: string;
+  opponent_abbr: string;
+  is_starter: boolean;
+  projected_pts: number;
+  projected_reb: number;
+  projected_ast: number;
+  source: "mock";
+}
+
+export interface PropsSnapshotResponse {
+  updated_at: string | null;
+  projections: PlayerProjection[];
+}
+

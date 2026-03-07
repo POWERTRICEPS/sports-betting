@@ -1,4 +1,10 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Image from "next/image";
+
 type Prop = {
+  espnPlayerId: string;
   player: string;
   team: string;
   opponent: string;
@@ -19,6 +25,10 @@ type Prop = {
   };
 };
 
+function getHeadshotUrl(espnPlayerId: string): string {
+  return `https://a.espncdn.com/i/headshots/nba/players/full/${espnPlayerId}.png`;
+}
+
 function FloorIndicator({ on }: { on: boolean }) {
   return (
     <div className="flex items-center gap-2 text-xs font-medium">
@@ -35,16 +45,45 @@ function FloorIndicator({ on }: { on: boolean }) {
 }
 
 export default function PlayerPropCard({ data }: { data: Prop }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const headshotUrl = getHeadshotUrl(data.espnPlayerId);
+  const initials = useMemo(
+    () =>
+      data.player
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join(""),
+    [data.player],
+  );
   return (
     <div className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <div>
-          <div className="text-lg font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
-            {data.player}
-          </div>
-          <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {data.team} vs {data.opponent}
+        <div className="flex items-center gap-3">
+          {imgFailed ? (
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-zinc-300 bg-zinc-100 text-xs font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              {initials || "N/A"}
+            </div>
+          ) : (
+            <Image
+              src={headshotUrl}
+              alt={data.player}
+              width={56}
+              height={56}
+              className="h-14 w-14 rounded-full object-cover border border-zinc-300 dark:border-zinc-700"
+              unoptimized
+              onError={() => setImgFailed(true)}
+            />
+          )}
+          <div>
+            <div className="text-lg font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
+              {data.player}
+            </div>
+            <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {data.team} vs {data.opponent}
+            </div>
           </div>
         </div>
 

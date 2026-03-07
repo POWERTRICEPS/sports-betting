@@ -213,3 +213,37 @@ Methods/headers:
 
 Credentials:
 - `allow_credentials=True`
+
+## Player Props (Mock Snapshot)
+
+### `GET /api/props`
+Returns the current player props snapshot used by frontend props views.
+
+Behavior:
+- Data is mock/placeholder for now (`source: "mock"`).
+- Snapshot is refreshed by `props_poll_loop` every 5 seconds.
+- If state is empty on first request, backend seeds with one mock payload.
+
+Response shape:
+
+```json
+{
+  "updated_at": "2026-03-05T21:12:30.123456Z",
+  "projections": [
+    {
+      "game_id": "401000001",
+      "player_id": "203999",
+      "player_name": "Nikola Jokic",
+      "team_abbr": "DEN",
+      "opponent_abbr": "LAL",
+      "is_starter": true,
+      "projected_pts": 28.4,
+      "projected_reb": 12.1,
+      "projected_ast": 9.3,
+      "source": "mock"
+    }
+  ]
+}
+
+
+
