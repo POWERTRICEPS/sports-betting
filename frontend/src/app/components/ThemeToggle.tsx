@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import moonSymbol from "./image/moon_symbol.png";
-import sunSymbol from "./image/sun_symbol.png";
+import moonSymbol from "../image/moon_symbol.png";
+import sunSymbol from "../image/sun_symbol.png";
 
 type Theme = "light" | "dark" | "system";
 

@@ -290,6 +290,26 @@ def games():
     
     return merge_gp(g, p)
 
+@app.get("/api/games/{date}")
+def games(date: str):
+    """
+    Returns games on date {date} with dashboard-viewable data only:
+    - game_id, status
+    - team names, abbreviations, records (wins/losses)
+    - current scores
+    - win probabilities (if historic, always 100/0)
+    
+    Data is from in-memory store updated every 5s by background poll.
+    Gracefully handles no available games by returning empty list.
+    """
+    try:
+        g = fetch_dashboard_games(date)
+        p = compute_win_probabilities(g)
+        return merge_gp(g, p)
+    except Exception as e:
+        print(f"Error in games by date: {e}")
+        return []
+
 @app.get("/api/props/{player_name}")
 def get_player_props(player_name: str):
     """

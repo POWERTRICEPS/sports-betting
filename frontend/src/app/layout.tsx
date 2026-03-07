@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { GameDataProvider } from "./GameDataProvider";
-import ThemeToggle from "./ThemeToggle";
+import ThemeToggle from "./components/ThemeToggle";
 import "./globals.css";
 import Image from "next/image";
 

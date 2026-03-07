@@ -4,7 +4,7 @@ import GameCard from "./games/GameCard";
 import Standings from "./standings/Standings";
 import { mockGames } from "./games/mock";
 import { useGameData } from "./GameDataProvider";
-
+import DateNav from "./components/DateNav";
 
 export default function GamesPage() {
   const { games, status, error } = useGameData();
@@ -25,13 +25,13 @@ export default function GamesPage() {
     });
   }
 
+  let today = new Date();
+
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 p-6 pt-20">
       <div className="mx-auto max-w-7xl">
-        <h1 className="text-2xl font-semibold text-emerald-400">Live Games</h1>
-        <p className="mt-1 text-zinc-600 dark:text-zinc-300">
-          Check out today&apos;s games and predictions
-        </p>
+
+        <DateNav date={today} />
 
         <div className="mt-6 grid grid-cols-6 gap-24">
           {/* LEFT: Game cards (5/7) */}

@@ -782,13 +782,15 @@ def fetch_games_from_nba() -> list[dict[str, Any]]:
     return result
 
 
-def fetch_dashboard_games() -> list[dict[str, Any]]:
+def fetch_dashboard_games(date : str = None) -> list[dict[str, Any]]:
     """
     Fetch lightweight game data from ESPN API for dashboard display.
     Returns only: game_id, status, team names/abbr, records, scores.
     Used by /api/games endpoint.
     """
     url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    if date:
+        url += f"?dates={date}"
     resp = requests.get(url, timeout=10)
     resp.raise_for_status()
     raw = resp.json()
