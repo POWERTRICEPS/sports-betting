@@ -12,7 +12,9 @@ Structured output:
 """
 import os
 import re
+import threading
 import time
+from collections import deque
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -551,55 +553,84 @@ def parse_lineup_data(raw_data: dict, game_date: str) -> dict:  # noqa: ARG001
     """Deprecated — prefer ``fetch_espn_lineups(game_date)`` instead."""
     return fetch_espn_lineups(game_date)
 
+# deque to keep track of timestamps of the last 10 requests
+_SPORTSGAMEODDS_REQUEST_TIMES: deque[float] = deque(maxlen=10)
+_SPORTSGAMEODDS_LOCK = threading.Lock()
+
+
+def _wait_sportsgameodds_rate_limit() -> None:
+    """
+    Wait for the SportsGameOdds rate limit to be available.
+    """
+    while True:
+        with _SPORTSGAMEODDS_LOCK:
+            now = time.monotonic()
+            if len(_SPORTSGAMEODDS_REQUEST_TIMES) < 10:
+                break
+            oldest = _SPORTSGAMEODDS_REQUEST_TIMES[0]
+            if now - oldest >= 65:
+                _SPORTSGAMEODDS_REQUEST_TIMES.popleft()
+                break
+            sleep_duration = 65 - (now - oldest)
+        time.sleep(sleep_duration)
+
+
+def _record_sportsgameodds_request() -> None:
+    """
+    Record a request to the SportsGameOdds API.
+    """
+    with _SPORTSGAMEODDS_LOCK:
+        _SPORTSGAMEODDS_REQUEST_TIMES.append(time.monotonic())
+
+
 def get_player_props(player_name: str) -> dict[str, Any]:
     """
-    Get player props from The Odds API. 
-    Retrieves points, rebounds, and assist O/U lines for a given player for different betting platforms. 
-    https://api.sportsgameodds.com/v2/events?apiKey=API_KEY_HERE&leagueID=NBA&oddsAvailable=true&oddIDs=points-PLAYER_ID-game-ou-over,points-PLAYER_ID-game-ou-under
+    Get player props from SportsGameOdds API.
+    Retrieves points, rebounds, and assist O/U lines for a given player for different betting platforms.
+    Uses a single request for all three stats.
+    https://api.sportsgameodds.com/v2/events?apiKey=API_KEY_HERE&leagueID=NBA&oddsAvailable=true&oddIDs=...
+
+    Args:
+        player_name: The name of the player to get props for.
     """
     player_entity_id = "_".join(player_name.split(" ")).upper() + "_1_NBA"
+    odd_ids = (
+        f"points-{player_entity_id}-game-ou-over,points-{player_entity_id}-game-ou-under,"
+        f"rebounds-{player_entity_id}-game-ou-over,rebounds-{player_entity_id}-game-ou-under,"
+        f"assists-{player_entity_id}-game-ou-over,assists-{player_entity_id}-game-ou-under"
+    )
+    url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs={odd_ids}"
 
-    def get_stat_odds(stat: str) -> dict[str, Any]:
-        if stat == "points":
-            url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs=points-{player_entity_id}-game-ou-over,points-{player_entity_id}-game-ou-under"
-        elif stat == "rebounds":
-            url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs=rebounds-{player_entity_id}-game-ou-over,rebounds-{player_entity_id}-game-ou-under"
-        elif stat == "assists":
-            url = f"https://api.sportsgameodds.com/v2/events?apiKey={ODDS_API_KEY}&leagueID=NBA&oddsAvailable=true&oddIDs=assists-{player_entity_id}-game-ou-over,assists-{player_entity_id}-game-ou-under"
-        else:
-            raise ValueError(f"Invalid stat: {stat}")
+    try:
+        _wait_sportsgameodds_rate_limit()
+        print(url)
         response = requests.get(url)
+        _record_sportsgameodds_request()
         data = response.json()
-        if "data" not in data or len(data["data"]) == 0:
-            return None
-        return data["data"][0]["odds"]
+        odds = data["data"][0]["odds"]
+    except Exception as e:
+        print(f"[get_player_props] failed to get odds for {player_name}: {e}")
+        return {}
+
+    def get_prop_odds(prop_json: dict) -> dict[str, Any]:
+        ret = {}
+        for bookmaker, o in prop_json.items():
+            ret[bookmaker] = {
+                "odds": o["odds"],
+                "line": o["overUnder"],
+            }
+        return ret
 
     payload = {}
     for stat in ["points", "rebounds", "assists"]:
-        data = get_stat_odds(stat)
-        if data is None:
-            continue
-        # rebounds-JALEN_DUREN_1_NBA-game-ou-over
         over_key = f"{stat}-{player_entity_id}-game-ou-over"
         under_key = f"{stat}-{player_entity_id}-game-ou-under"
-
-        def get_prop_odds(prop_json: dict) -> dict[str, Any]:
-            ret = {}
-            for bookmaker, odds in prop_json.items():
-                ret[bookmaker] = {
-                    "odds": odds["odds"],
-                    "line": odds["overUnder"],
-                }
-            return ret
-
-        over_prop_odds = get_prop_odds(data[over_key]["byBookmaker"])
-        under_prop_odds = get_prop_odds(data[under_key]["byBookmaker"])
-
+        if over_key not in odds or under_key not in odds:
+            continue
         payload[stat] = {
-            "over": over_prop_odds,
-            "under": under_prop_odds,
+            "over": get_prop_odds(odds[over_key]["byBookmaker"]),
+            "under": get_prop_odds(odds[under_key]["byBookmaker"]),
         }
-
     return payload
 
 
