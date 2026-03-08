@@ -14,7 +14,7 @@ from util import (
     parse_game_data,
     parse_dashboard_game_data,
     merge_gp,
-    fetch_espn_lineups,
+    fetch_salary_based_lineups,
     fetch_standings_from_espn,
     fetch_full_game_stats,
     fetch_dashboard_games,
@@ -357,8 +357,9 @@ def get_player_props(game_date: str):
     """
     Returns player PTS, REB, and AST props for all players in lineups on a certain date.
     Also includes over/under lines from different bookmakers (platforms).
+    Uses salary-based projected lineups so data is available before tip-off.
     """
-    lineups = fetch_espn_lineups(game_date)
+    lineups = fetch_salary_based_lineups(game_date)
     if not lineups:
         return {
             "error": "No lineups found",
@@ -421,7 +422,7 @@ def get_lineups(game_date: str):
         }
 
     try:
-        return fetch_espn_lineups(game_date)
+        return fetch_salary_based_lineups(game_date)
     except requests.exceptions.Timeout:
         return {
             "error": "Request timeout. ESPN may be slow or unavailable.",
