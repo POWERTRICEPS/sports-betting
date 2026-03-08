@@ -14,7 +14,6 @@ from util import (
     parse_game_data,
     parse_dashboard_game_data,
     merge_gp,
-    fetch_espn_lineups,
     fetch_salary_based_lineups,
     fetch_standings_from_espn,
     fetch_games_from_nba,
