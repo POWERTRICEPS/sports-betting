@@ -129,19 +129,26 @@ def _fetch_game_history_sync(
 
     query = f"""
         SELECT
-            past_game_id,
-            game_date,
-            home_team,
-            home_team_score,
-            away_team,
-            away_team_score,
-            game_stadium,
-            home_win_probability,
-            away_win_probability,
-            probability_last_updated
-        FROM past_game_info
-        {where_clause}
-        ORDER BY game_date {direction}
+            i.past_game_id,
+            i.game_date,
+            i.home_team,
+            i.home_team_score,
+            i.away_team,
+            i.away_team_score,
+            i.game_stadium,
+            i.home_win_probability,
+            i.away_win_probability,
+            i.probability_last_updated,
+            s.home_abbreviation,
+            s.away_abbreviation,
+            s.home_wins,
+            s.home_losses,
+            s.away_wins,
+            s.away_losses
+        FROM past_game_info i
+        LEFT JOIN past_game_stats s ON i.past_game_id = s.past_game_id
+        {where_clause.replace('game_date', 'i.game_date')}
+        ORDER BY i.game_date {direction}
     """
     if limit is not None:
         query += " LIMIT %s"
@@ -160,7 +167,7 @@ def _fetch_game_history_sync(
 
 def past_game_row_to_dashboard_game(row: dict) -> dict:
     """
-    Map a past_game_info row to the dashboard game shape expected by merge_gp and the frontend.
+    Map a past_game_info row to the dashboard game shape.
     """
     gid = str(row["past_game_id"])
     return {
@@ -168,15 +175,15 @@ def past_game_row_to_dashboard_game(row: dict) -> dict:
         "status": "Final",
         "home_team": row.get("home_team", ""),
         "home_city": row.get("game_stadium") or "",
-        "home_abbreviation": "",
-        "home_wins": 0,
-        "home_losses": 0,
+        "home_abbreviation": (row.get("home_abbreviation") or "").strip(),
+        "home_wins": int(row.get("home_wins") or 0),
+        "home_losses": int(row.get("home_losses") or 0),
         "home_score": int(row.get("home_team_score") or 0),
         "away_team": row.get("away_team", ""),
         "away_city": "",
-        "away_abbreviation": "",
-        "away_wins": 0,
-        "away_losses": 0,
+        "away_abbreviation": (row.get("away_abbreviation") or "").strip(),
+        "away_wins": int(row.get("away_wins") or 0),
+        "away_losses": int(row.get("away_losses") or 0),
         "away_score": int(row.get("away_team_score") or 0),
     }
 

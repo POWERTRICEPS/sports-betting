@@ -323,7 +323,6 @@ async def games_by_date(date: str):
     - If date is today: fetches from ESPN (live/upcoming).
     - If date is not today: fetches from database (completed games only).
     """
-    print("games_by_date route hit")
     try:
         parsed = _parse_date_param(date)
         if parsed is None:
@@ -332,14 +331,11 @@ async def games_by_date(date: str):
         date_yyyy_mm_dd = parsed.isoformat()
 
         if is_today:
-            print("fetching dashboard games for today")
             g = fetch_dashboard_games()
             p = compute_win_probabilities(g)
             return merge_gp(g, p)
         else:
-            print("fetching game history for date: ", date_yyyy_mm_dd)
             days = await fetch_game_history(order="asc", date=date_yyyy_mm_dd)
-            print("days: ", days)
             if not days or not days[0].get("games"):
                 return []
             rows = days[0]["games"]
@@ -351,7 +347,6 @@ async def games_by_date(date: str):
                 }
                 for row in rows
             }
-            print("merging games and probabilities")
             return merge_gp(g, p)
     except Exception as e:
         print(f"Error in games by date: {e}")

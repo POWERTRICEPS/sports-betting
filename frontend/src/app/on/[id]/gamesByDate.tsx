@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 import { Game } from "@/app/types";
 import DateNav from "@/app/components/DateNav";
 
-const BACKEND_URL = "pj09-sports-betting.onrender.com";
-// const BACKEND_URL = "localhost:8000";
+// const BACKEND_URL = "pj09-sports-betting.onrender.com";
+const BACKEND_URL = "localhost:8000";
 const isLocal =
   BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
 const API_URL = isLocal ? `http://${BACKEND_URL}` : `https://${BACKEND_URL}`;
@@ -28,11 +28,16 @@ export default function GamesByDate({ id }: { id: string }) {
     fetchGameByDateId();
   }, []);
 
-  const today = new Date(
-    Number(id.slice(0, 4)),
-    Number(id.slice(4, 6)) - 1,
-    Number(id.slice(6, 8)),
-  );
+  // Support YYYYMMDD or YYYY-MM-DD from URL
+  const ymd = id.replace(/-/g, "");
+  const today =
+    ymd.length >= 8
+      ? new Date(
+          Number(ymd.slice(0, 4)),
+          Number(ymd.slice(4, 6)) - 1,
+          Number(ymd.slice(6, 8)),
+        )
+      : new Date();
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 p-6 pt-20">
