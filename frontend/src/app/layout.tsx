@@ -97,7 +97,18 @@ export default function RootLayout({
           </Link>
         </div>
 
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-3">
+          <Link
+            href="/info"
+            aria-label="Open app guide"
+            title="App guide"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full
+              bg-slate-100/80 text-slate-800 hover:bg-slate-100
+              dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700
+              ring-1 ring-slate-300 dark:ring-zinc-600 transition-colors"
+          >
+            <span className="text-lg font-bold leading-none">?</span>
+          </Link>
           <ThemeToggle />
         </div>
 
