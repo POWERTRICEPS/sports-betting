@@ -1,3 +1,9 @@
+export interface ProbabilitySnapshot {
+  clock: string;
+  home_win_prob: number;
+  away_win_prob: number;
+}
+
 export interface Game {
   game_id: string;
   status: string;
@@ -56,6 +62,8 @@ export interface Game {
 
   home_win_prob?: number | null;
   away_win_prob?: number | null;
+
+  probability_history?: ProbabilitySnapshot[];
 }
 
 export type ConnectionStatus =
