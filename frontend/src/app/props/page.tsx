@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import PropsPageClient from "./PropsPageClient";
+import { useState, useMemo } from "react";
+import { mockProps } from "./mock";
 
 export default function PropsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>("All");
