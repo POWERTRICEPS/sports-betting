@@ -3,7 +3,6 @@
 import GameCard from "../../games/GameCard";
 import Standings from "../../standings/Standings";
 import { mockGames } from "../../games/mock";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Game } from "@/app/types";
 import DateNav from "@/app/components/DateNav";
@@ -26,7 +25,7 @@ export default function GamesByDate({ id }: { id: string }) {
       setDisplayGames(data.length ? data : mockGames);
     }
     fetchGameByDateId();
-  }, []);
+  }, [id]);
 
   const today = new Date(
     Number(id.slice(0, 4)),
@@ -39,7 +38,7 @@ export default function GamesByDate({ id }: { id: string }) {
       <div className="mx-auto max-w-7xl">
         <DateNav date={today} />
 
-        <div className="mt-6 grid grid-cols-6 gap-24">
+        <div key={id} className="mt-6 grid grid-cols-6 gap-24">
           {/* LEFT: Game cards (5/7) */}
           <div className="col-span-4 grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             {displayGames.map((game) => (
