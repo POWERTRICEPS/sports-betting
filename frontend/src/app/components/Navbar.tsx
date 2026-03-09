@@ -41,7 +41,7 @@ export default function Navbar() {
     <Link
     href="/"
     className={`relative flex items-center gap-2 font-semibold transition-all duration-200
-    ${pathname === "/"
+    ${pathname === "/" || pathname.startsWith("/on/") || pathname.startsWith("/games/")
         ? "text-blue-600 dark:text-blue-400"
         : "text-black dark:text-white hover:text-blue-700 dark:hover:text-blue-400"
     }`}
@@ -49,7 +49,7 @@ export default function Navbar() {
     <Activity size={18} className="translate-y-[1px]" />
     Games
 
-    {pathname === "/" && (
+    {(pathname === "/" || pathname.startsWith("/on/") || pathname.startsWith("/games/")) && (
         <span className="absolute -bottom-2 left-0 right-0 -mx-6 h-[3px] bg-blue-800 rounded-full"></span>
     )}
     </Link>

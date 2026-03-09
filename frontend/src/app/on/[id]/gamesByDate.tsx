@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 import { Game } from "@/app/types";
 import DateNav from "@/app/components/DateNav";
 
-// const BACKEND_URL = "pj09-sports-betting.onrender.com";
-const BACKEND_URL = "localhost:8000";
+const BACKEND_URL = "pj09-sports-betting.onrender.com";
+// const BACKEND_URL = "localhost:8000";
 const isLocal =
   BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
 const API_URL = isLocal ? `http://${BACKEND_URL}` : `https://${BACKEND_URL}`;

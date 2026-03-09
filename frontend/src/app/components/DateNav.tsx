@@ -29,6 +29,18 @@ function isBeforeMin(year: number, month: number, day: number) {
   return d < MIN;
 }
 
+// Before March 7, 2026 (March 7 is allowed)
+function isDateBeforeMin(d: Date) {
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const day = d.getDate();
+  if (y < 2026) return true;
+  if (y > 2026) return false;
+  if (m < 2) return true; // Mar = 2
+  if (m > 2) return false;
+  return day < 7;
+}
+
 // After April 12, 2026 (April 12 is allowed)
 function isAfterMax(year: number, month: number, day: number) {
   if (year > 2026) return true;
@@ -281,14 +293,15 @@ export default function DateNav({ date: today }: { date: Date }) {
             `/on/${yesterday.getFullYear()}${(yesterday.getMonth() + 1).toString().padStart(2, "0")}${yesterday.getDate().toString().padStart(2, "0")}`,
           )
         }
-        className="text-xl px-1.5 hover:opacity-60 transition-opacity duration-150"
+        disabled={isDateBeforeMin(yesterday)}
+        className="text-xl px-1.5 hover:opacity-60 transition-opacity duration-150 disabled:opacity-40 disabled:pointer-events-none"
         aria-label="Previous day"
       >
         ←
       </button>
 
       <div className="flex gap-10">
-        {isDateAfterMax(d2) ? (
+        {isDateBeforeMin(d2) || isDateAfterMax(d2) ? (
           <span className="flex flex-col items-center text-zinc-400 dark:text-zinc-500">
             <span className="font-semibold">{dotw[d2.getDay()]}</span>
             <span>
@@ -307,7 +320,7 @@ export default function DateNav({ date: today }: { date: Date }) {
           </Link>
         )}
 
-        {isDateAfterMax(yesterday) ? (
+        {isDateBeforeMin(yesterday) || isDateAfterMax(yesterday) ? (
           <span className="flex flex-col items-center text-zinc-400 dark:text-zinc-500">
             <span className="font-semibold">{dotw[yesterday.getDay()]}</span>
             <span>
