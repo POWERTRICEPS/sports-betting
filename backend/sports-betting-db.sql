@@ -115,17 +115,15 @@ CREATE TABLE game_probability_history (
     probability_id SERIAL PRIMARY KEY,
     game_id INT NOT NULL,
     calculation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    game_time_elapsed TIME NOT NULL,
-    quarter INT,
+    clock_display VARCHAR(50) NOT NULL,
     home_team_score INT NOT NULL,
     away_team_score INT NOT NULL,
     home_win_probability FLOAT NOT NULL,
-    away_win_probability FLOAT NOT NULL,
-    llm_model_version VARCHAR(50)
+    away_win_probability FLOAT NOT NULL
 );
 
--- Index for efficient querying of probability history by game and time
-CREATE INDEX idx_game_timestamp ON game_probability_history(game_id, calculation_timestamp);
+-- Index for efficient querying of probability history by game
+CREATE INDEX idx_prob_history_game_id ON game_probability_history(game_id);
 
 -- Table to hold info for the players that are currently playing in the game
 CREATE TABLE player_in_game_info (

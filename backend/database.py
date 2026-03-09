@@ -452,5 +452,86 @@ def get_historical_team_stats(game_id: str) -> dict:
     }
 
 
+def _save_probability_history_sync(game_id: str, history: list[dict]) -> int:
+    """
+    Bulk-insert probability history snapshots for a completed game
+    into game_probability_history.  Existing rows for the same game_id
+    are deleted first so re-saves are idempotent.
+    """
+    if not history:
+        return 0
+
+    gid = int(game_id)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM game_probability_history WHERE game_id = %s",
+                (gid,),
+            )
+            for snap in history:
+                cur.execute(
+                    """
+                    INSERT INTO game_probability_history
+                        (game_id, clock_display, home_team_score, away_team_score,
+                         home_win_probability, away_win_probability)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        gid,
+                        str(snap.get("clock", "")),
+                        int(snap.get("home_score", 0) or 0),
+                        int(snap.get("away_score", 0) or 0),
+                        float(snap.get("home_win_prob", 0)),
+                        float(snap.get("away_win_prob", 0)),
+                    ),
+                )
+    return len(history)
+
+
+async def save_probability_history(game_id: str, history: list[dict]) -> int:
+    """Async wrapper: persist probability history for a finished game."""
+    import asyncio
+    try:
+        count = await asyncio.to_thread(_save_probability_history_sync, game_id, history)
+        if count:
+            print(f"[db] saved {count} probability snapshots for game {game_id}")
+        return count
+    except Exception as e:
+        print(f"[db] failed to save probability history for game {game_id}: {e}")
+        return 0
+
+
+def get_probability_history(game_id: str) -> list[dict]:
+    """
+    Fetch stored probability history for a past game from the database.
+    Returns a list of snapshot dicts matching the in-memory format.
+    """
+    try:
+        gid = int(game_id)
+    except (TypeError, ValueError):
+        return []
+
+    rows = execute_query(
+        """
+        SELECT clock_display, home_team_score, away_team_score,
+               home_win_probability, away_win_probability
+        FROM game_probability_history
+        WHERE game_id = %s
+        ORDER BY probability_id ASC
+        """,
+        (gid,),
+    )
+    return [
+        {
+            "clock": row["clock_display"],
+            "home_score": row["home_team_score"],
+            "away_score": row["away_team_score"],
+            "home_win_prob": row["home_win_probability"],
+            "away_win_prob": row["away_win_probability"],
+        }
+        for row in rows
+    ]
+
+
 if __name__ == "__main__":
     test_connection()
