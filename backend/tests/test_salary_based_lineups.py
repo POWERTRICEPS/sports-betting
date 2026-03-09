@@ -9,7 +9,7 @@ ROOT = os.path.dirname(os.path.dirname(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from util import fetch_salary_based_lineups
+from util import fetch_salary_based_lineups, _pick_starters_by_salary
 
 
 class _FakeResponse:
@@ -82,6 +82,39 @@ def _posted_starters_summary(home_count: int, away_count: int) -> dict:
 
 
 class SalaryBasedLineupsTest(unittest.TestCase):
+    def test_pick_starters_prefers_positive_salary_players(self) -> None:
+        roster = [
+            {"name": "G1", "position": "G", "salary": 10, "player_id": "g1", "espn_player_id": "g1", "jersey": "1"},
+            {"name": "G2", "position": "G", "salary": 9, "player_id": "g2", "espn_player_id": "g2", "jersey": "2"},
+            {"name": "F1", "position": "F", "salary": 8, "player_id": "f1", "espn_player_id": "f1", "jersey": "3"},
+            {"name": "F2", "position": "F", "salary": 7, "player_id": "f2", "espn_player_id": "f2", "jersey": "4"},
+            {"name": "X1", "position": "F", "salary": 6, "player_id": "x1", "espn_player_id": "x1", "jersey": "5"},
+            {"name": "C0", "position": "C", "salary": 0, "player_id": "c0", "espn_player_id": "c0", "jersey": "6"},
+        ]
+
+        starters = _pick_starters_by_salary(roster)
+        salaries = [float(p.get("salary") or 0) for p in starters]
+        player_ids = {p["player_id"] for p in starters}
+
+        self.assertEqual(len(starters), 5)
+        self.assertTrue(all(s > 0 for s in salaries))
+        self.assertNotIn("c0", player_ids)
+
+    def test_pick_starters_allows_zero_salary_when_not_enough_positive_players(self) -> None:
+        roster = [
+            {"name": "G1", "position": "G", "salary": 10, "player_id": "g1", "espn_player_id": "g1", "jersey": "1"},
+            {"name": "G2", "position": "G", "salary": 9, "player_id": "g2", "espn_player_id": "g2", "jersey": "2"},
+            {"name": "F1", "position": "F", "salary": 8, "player_id": "f1", "espn_player_id": "f1", "jersey": "3"},
+            {"name": "C1", "position": "C", "salary": 7, "player_id": "c1", "espn_player_id": "c1", "jersey": "4"},
+            {"name": "X0", "position": "F", "salary": 0, "player_id": "x0", "espn_player_id": "x0", "jersey": "5"},
+        ]
+
+        starters = _pick_starters_by_salary(roster)
+        player_ids = {p["player_id"] for p in starters}
+
+        self.assertEqual(len(starters), 5)
+        self.assertIn("x0", player_ids)
+
     @patch("util._pick_starters_by_salary")
     @patch("util._fetch_team_roster")
     @patch("util.requests.get")

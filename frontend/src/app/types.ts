@@ -83,3 +83,22 @@ export interface StandingsResponse {
   east_standings: TeamData[];
   west_standings: TeamData[];
 }
+
+export interface PlayerProjection {
+  game_id: string;
+  player_id: string;
+  espn_player_id: string;
+  player_name: string;
+  team_abbr: string;
+  opponent_abbr: string;
+  is_starter: boolean;
+  projected_pts: number;
+  projected_reb: number;
+  projected_ast: number;
+  source: "mock" | "model";
+}
+
+export interface PropsSnapshotResponse {
+  updated_at: string | null;
+  projections: PlayerProjection[];
+}

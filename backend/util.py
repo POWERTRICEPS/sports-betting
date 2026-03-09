@@ -535,6 +535,11 @@ def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any
         each with keys: ``name``, ``position``, ``salary``, ``player_id``,
         ``jersey``.
     """
+    # Prefer players with known positive salary; ESPN can return 0 for missing contract data.
+    # Only fall back to zero-salary players if a team has fewer than 5 positive-salary players.
+    positive_salary = [p for p in roster if float(p.get("salary") or 0) > 0]
+    candidate_pool = positive_salary if len(positive_salary) >= 5 else list(roster)
+
     # Position buckets: how many starters we need per position group
     needs = {"G": 2, "F": 2, "C": 1}
     starters: list[dict[str, Any]] = []
@@ -543,7 +548,7 @@ def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any
     # First pass: fill each position bucket with highest-paid players
     for pos, count in needs.items():
         candidates = [
-            p for p in roster
+            p for p in candidate_pool
             if p["position"] == pos and p["player_id"] not in used_ids
         ]
         for player in candidates[:count]:
@@ -552,7 +557,7 @@ def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any
 
     # Second pass: if we have fewer than 5, fill with highest-paid remaining
     if len(starters) < 5:
-        remaining = [p for p in roster if p["player_id"] not in used_ids]
+        remaining = [p for p in candidate_pool if p["player_id"] not in used_ids]
         for player in remaining:
             if len(starters) >= 5:
                 break

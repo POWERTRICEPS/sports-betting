@@ -47,6 +47,40 @@ FEATURE_COLUMNS = {
 
 _loaded_models: dict[str, Any | None] = {}
 _load_attempted: set[str] = set()
+_schema_validated: set[str] = set()
+
+
+def _expected_feature_count(stat: str) -> int:
+    return len(FEATURE_COLUMNS[stat])
+
+
+def _model_feature_count(model: Any) -> int | None:
+    try:
+        if hasattr(model, "n_features_in_"):
+            return int(model.n_features_in_)
+    except Exception:
+        pass
+    try:
+        if hasattr(model, "get_booster"):
+            booster = model.get_booster()
+            return int(booster.num_features())
+    except Exception:
+        pass
+    return None
+
+
+def _validate_model_schema(stat: str, model: Any) -> None:
+    if stat in _schema_validated:
+        return
+    _schema_validated.add(stat)
+    expected = _expected_feature_count(stat)
+    actual = _model_feature_count(model)
+    if actual is not None and actual != expected:
+        print(
+            f"[live_props] feature schema mismatch stat={stat}: "
+            f"model expects {actual}, code provides {expected}. "
+            f"Check FEATURE_COLUMNS order/shape."
+        )
 
 
 def _load_model(stat: str) -> Any | None:
@@ -67,6 +101,7 @@ def _load_model(stat: str) -> Any | None:
         import joblib
 
         model = joblib.load(path)
+        _validate_model_schema(stat, model)
         _loaded_models[stat] = model
         return model
     except Exception as e:
