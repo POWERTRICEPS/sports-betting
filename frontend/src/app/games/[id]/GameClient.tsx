@@ -4,8 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Game } from "@/app/types";
 import { mockGames } from "../mock";
-import { useEffect, useRef, useState } from "react";
-import WinProbabilityGraph from "./WinProbabilityGraph";
+import { useEffect, useRef, useState, useCallback } from "react";
+import WinProbabilityGraph, { ProbSnapshot } from "./WinProbabilityGraph";
 
 const BACKEND_URL = "pj09-sports-betting.onrender.com";
 //const BACKEND_URL = "localhost:8000";
@@ -14,19 +14,66 @@ const isLocal =
 const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
 const API_URL = isLocal ? `http://${BACKEND_URL}` : `https://${BACKEND_URL}`;
 
+/** Build a ProbSnapshot from a Game if ML probabilities are present. */
+function captureSnapshot(g: Game): ProbSnapshot | null {
+  if (g.home_win_prob == null || g.away_win_prob == null) return null;
+  return {
+    home: g.home_win_prob,
+    away: g.away_win_prob,
+    homeScore: g.home_score ?? null,
+    awayScore: g.away_score ?? null,
+    label: g.status,
+  };
+}
+
 export default function GameClient({ id }: { id: string }) {
   const imgSize = 150;
   const [game, setGame] = useState<Game | null>(null);
+  const [probHistory, setProbHistory] = useState<ProbSnapshot[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Initial HTTP fetch for immediate data on page load
+  /** Append a snapshot, skipping near-duplicates to keep the chart clean. */
+  const pushSnapshot = useCallback((snap: ProbSnapshot) => {
+    setProbHistory((prev) => {
+      const last = prev[prev.length - 1];
+      if (last) {
+        const probChanged = Math.abs(snap.home - last.home) >= 0.1;
+        // Detect quarter change (e.g. "Q1 …" → "Q2 …" or "Halftime")
+        const quarterChanged = snap.label.slice(0, 2) !== last.label.slice(0, 2);
+        if (!probChanged && !quarterChanged) return prev; // skip duplicate
+      }
+      return [...prev, snap];
+    });
+  }, []);
+
+  // Initial HTTP fetch for game data + accumulated probability history
   useEffect(() => {
     async function fetchGame() {
       try {
-        const res = await fetch(`${API_URL}/api/games/stats/${id}`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
+        // Fetch game stats and prob history in parallel
+        const [statsRes, histRes] = await Promise.all([
+          fetch(`${API_URL}/api/games/stats/${id}`),
+          fetch(`${API_URL}/api/games/${id}/prob-history`),
+        ]);
+
+        if (!statsRes.ok) throw new Error(`HTTP error! status: ${statsRes.status}`);
+        const data = await statsRes.json();
         setGame(data);
+
+        // Seed history from backend-accumulated snapshots (covers the full game lifespan)
+        if (histRes.ok) {
+          const history: ProbSnapshot[] = await histRes.json();
+          if (history.length > 0) {
+            setProbHistory(history);
+          } else {
+            // No backend history yet — start with the current snapshot
+            const snap = captureSnapshot(data);
+            if (snap) setProbHistory([snap]);
+          }
+        } else {
+          const snap = captureSnapshot(data);
+          if (snap) setProbHistory([snap]);
+        }
       } catch (err) {
         console.error("Failed to fetch game data:", err);
         const fallbackGame = mockGames[0];
@@ -60,6 +107,9 @@ export default function GameClient({ id }: { id: string }) {
           if (data && typeof data === "object" && data.game_id === id) {
             console.log("Setting game data from websocket:", data);
             setGame(data);
+            // Accumulate ML probability snapshot
+            const snap = captureSnapshot(data);
+            if (snap) pushSnapshot(snap);
           }
         } catch (err) {
           console.error("[GameClient] Failed to parse WS message:", err);
@@ -88,7 +138,7 @@ export default function GameClient({ id }: { id: string }) {
         wsRef.current = null;
       }
     };
-  }, [id]);
+  }, [id, pushSnapshot]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 p-6 pt-20 text-gray-900 dark:text-zinc-100">
@@ -410,7 +460,7 @@ export default function GameClient({ id }: { id: string }) {
           </div>
         </div>
 
-        {game && <WinProbabilityGraph game={game} />}
+        {game && <WinProbabilityGraph game={game} probHistory={probHistory} />}
       </div>
     </div>
   );

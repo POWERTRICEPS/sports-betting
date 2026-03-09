@@ -31,6 +31,56 @@ from database import (
     is_game_final,
 )
 
+def _append_prob_snapshots(
+    games: list[dict[str, Any]],
+    probabilities: dict[str, dict[str, float]],
+) -> None:
+    """
+    Append a probability snapshot for each game to PROB_HISTORY_STATE.
+    Skips near-duplicate entries (same probability ±0.1 and same quarter).
+    """
+    active_ids: set[str] = set()
+    for game in games:
+        gid = game.get("game_id")
+        if not gid:
+            continue
+        active_ids.add(gid)
+
+        prob = probabilities.get(gid)
+        if not prob:
+            continue
+
+        home = prob.get("home_win_prob")
+        away = prob.get("away_win_prob")
+        if home is None or away is None:
+            continue
+
+        snap: dict[str, Any] = {
+            "home": home,
+            "away": away,
+            "homeScore": game.get("home_score"),
+            "awayScore": game.get("away_score"),
+            "label": game.get("status", ""),
+        }
+
+        history = app_state.PROB_HISTORY_STATE.setdefault(gid, [])
+
+        # Deduplicate: skip if probability barely changed and quarter is the same
+        if history:
+            last = history[-1]
+            prob_changed = abs(snap["home"] - last["home"]) >= 0.1
+            quarter_changed = snap["label"][:2] != last["label"][:2]
+            if not prob_changed and not quarter_changed:
+                continue
+
+        history.append(snap)
+
+    # Clean up history for games that ESPN no longer returns
+    stale_ids = set(app_state.PROB_HISTORY_STATE.keys()) - active_ids
+    for stale_id in stale_ids:
+        del app_state.PROB_HISTORY_STATE[stale_id]
+
+
 async def update_games_and_probabilities():
     """
     Update the games and probabilities in the in-memory store and broadcast to WebSocket clients.
@@ -42,6 +92,9 @@ async def update_games_and_probabilities():
     app_state.GAMES_STATE.extend(games)
     app_state.PROBABILITIES_STATE.clear()
     app_state.PROBABILITIES_STATE.update(probabilities)
+
+    # Accumulate probability snapshots for the win-probability graph
+    _append_prob_snapshots(games, probabilities)
     
     result = merge_gp(games, probabilities)
     games_targets = manager.topic_connection_labels("games")
@@ -437,33 +490,15 @@ def get_lineups(game_date: str):
             "games": []
         }
 
-# Game History Route (from database)
-@app.get("/api/games/history")
-async def game_history(
-    order: str = "desc",
-    limit: int | None = None,
-    date: str | None = None,
-):
+@app.get("/api/games/{game_id}/prob-history")
+def game_prob_history(game_id: str):
     """
-    Returns past game results from the database, sorted by date.
+    Returns the accumulated ML win-probability snapshots for a game.
+    Each entry: { home, away, homeScore, awayScore, label }.
+    The list grows every poll cycle while the game is on ESPN's scoreboard.
+    """
+    return app_state.PROB_HISTORY_STATE.get(game_id, [])
 
-    Query params:
-        order: 'desc' (newest first, default) or 'asc' (oldest first)
-        limit: max number of results (optional)
-        date:  'YYYY-MM-DD' — return only games on this date (optional)
-    """
-    try:
-        days = await fetch_game_history(order=order, limit=limit, date=date)
-        total_games = sum(len(d["games"]) for d in days)
-        return {
-            "total_days": len(days),
-            "total_games": total_games,
-            "order": order,
-            "days": days,
-        }
-    except Exception as e:
-        print(f"Error fetching game history: {e}")
-        raise HTTPException(status_code=503, detail=str(e))
 
 # Endpoint for specific game using game_id
 @app.get("/api/games/stats/{game_id}")

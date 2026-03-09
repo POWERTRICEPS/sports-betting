@@ -17,11 +17,7 @@ PROBABILITIES_STATE: dict[str, dict[str, float]] = {}
 # {'player name': {'bookmaker': {'points': {'over_odds': -120, 'under_odds': 100, 'line': 17.5}}}}
 PLAYER_PROPS_STATE: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}   # player name -> bookmaker -> stat -> odds
 
-# Game IDs already saved to database to prevent duplicates
-SAVED_FINAL_GAME_IDS: set[str] = set()
-
-# Live/mock props snapshot for /api/props and WS topic "props"
-PROPS_SNAPSHOT_STATE: dict[str, Any] = {
-    "updated_at": None,
-    "projections": [],
-}
+# Probability history by game_id — accumulated every poll cycle.
+# Each entry: { "home": float, "away": float, "homeScore": int|None, "awayScore": int|None, "label": str }
+# Lives as long as the server process runs (matches ESPN scoreboard lifespan).
+PROB_HISTORY_STATE: dict[str, list[dict[str, Any]]] = {}
