@@ -13,6 +13,11 @@ GAMES_STATE: list[dict[str, Any]] = []
 # Win probabilities by game_id: { "game_id": { "home_win_prob": 0.6, "away_win_prob": 0.4 } }
 PROBABILITIES_STATE: dict[str, dict[str, float]] = {}
 
+# Probability history per game – one snapshot per poll cycle.
+# { game_id: [ {"clock": "7:07 - 3rd", "home_win_prob": 65.2, "away_win_prob": 34.8}, ... ] }
+MAX_PROB_HISTORY = 2000
+PROBABILITY_HISTORY: dict[str, list[dict[str, Any]]] = {}
+
 # Player props by player name for upcoming days
 # {'player name': {'bookmaker': {'points': {'over_odds': -120, 'under_odds': 100, 'line': 17.5}}}}
 PLAYER_PROPS_STATE: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}   # player name -> bookmaker -> stat -> odds

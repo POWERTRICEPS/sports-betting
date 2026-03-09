@@ -42,7 +42,28 @@ async def update_games_and_probabilities():
     app_state.GAMES_STATE.extend(games)
     app_state.PROBABILITIES_STATE.clear()
     app_state.PROBABILITIES_STATE.update(probabilities)
-    
+
+    # Accumulate probability snapshots for win-probability graph
+    for game in games:
+        game_id = str(game["game_id"])
+        if game_id not in probabilities:
+            continue
+        probs = probabilities[game_id]
+        snapshot = {
+            "clock": game.get("status", ""),
+            "home_score": int(game.get("home_score", 0) or 0),
+            "away_score": int(game.get("away_score", 0) or 0),
+            "home_win_prob": probs["home_win_prob"],
+            "away_win_prob": probs["away_win_prob"],
+        }
+        history = app_state.PROBABILITY_HISTORY.setdefault(game_id, [])
+        # Skip exact duplicate consecutive snapshots
+        if not history or history[-1] != snapshot:
+            history.append(snapshot)
+            # Cap history size
+            if len(history) > app_state.MAX_PROB_HISTORY:
+                del history[0]
+
     result = merge_gp(games, probabilities)
     games_targets = manager.topic_connection_labels("games")
     print(
@@ -96,6 +117,9 @@ async def update_subscribed_game_stats():
                 continue
 
             merged = merge_gp([target], probabilities)[0]
+            merged["probability_history"] = list(
+                app_state.PROBABILITY_HISTORY.get(game_id, [])
+            )
 
             topic = f"game:{game_id}"
 
@@ -481,6 +505,9 @@ def single_game_stats(game_id: str):
         hist = get_historical_team_stats(game_id)
         if not hist:
             return {"error": "Game not found"}, 404
+        hist["probability_history"] = list(
+            app_state.PROBABILITY_HISTORY.get(game_id, [])
+        )
         return hist
     
     # Fetch full stats for this specific game
@@ -494,6 +521,9 @@ def single_game_stats(game_id: str):
             return {"error": "Invalid game_id"}, 404
         
         result = merge_gp([target], p)
+        result[0]["probability_history"] = list(
+            app_state.PROBABILITY_HISTORY.get(game_id, [])
+        )
         print(result[0])
         return result[0]
     except Exception as e:
