@@ -21,3 +21,10 @@ PLAYER_PROPS_STATE: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}   # pla
 # Each entry: { "home": float, "away": float, "homeScore": int|None, "awayScore": int|None, "label": str }
 # Lives as long as the server process runs (matches ESPN scoreboard lifespan).
 PROB_HISTORY_STATE: dict[str, list[dict[str, Any]]] = {}
+
+# Track which final games have already been saved to the database
+# so we don't re-save them on every poll cycle.
+SAVED_FINAL_GAME_IDS: set[str] = set()
+
+# Current props snapshot (mock or live) — broadcast via WebSocket topic "props".
+PROPS_SNAPSHOT_STATE: dict[str, Any] = {}

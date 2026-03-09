@@ -7,7 +7,7 @@ import requests
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from datetime import datetime
+from datetime import date as date_type, datetime
 
 from util import (
     compute_win_probabilities,
@@ -19,10 +19,8 @@ from util import (
     fetch_full_game_stats,
     fetch_dashboard_games,
     get_player_props as fetch_player_props,
-
 )
 import state as app_state
-from datetime import date as date_type, datetime
 from database import (
     fetch_game_history,
     save_completed_games_to_db,
@@ -444,7 +442,7 @@ def get_player_props(game_date: str):
             for player in starters:
                 raw_name = player.get("name", "")
                 player_name = get_player_name(raw_name)
-                player_props = get_player_props(player_name)
+                player_props = fetch_player_props(player_name)
                 team_props[player_name] = player_props
 
             props[team_abbrev] = team_props
@@ -588,10 +586,11 @@ async def props_poll_loop():
         await asyncio.sleep(5)
 
 
-@app.get("/api/props")
-def props():
+@app.get("/api/props/snapshot")
+def props_snapshot():
     """
     Returns current props snapshot (mock for now).
+    Used by the WebSocket "props" topic for real-time updates.
     """
     if not app_state.PROPS_SNAPSHOT_STATE.get("projections"):
         app_state.PROPS_SNAPSHOT_STATE.update(_build_mock_props_payload())
