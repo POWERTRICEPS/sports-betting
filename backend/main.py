@@ -376,52 +376,14 @@ async def games_by_date(date: str):
         print(f"Error in games by date: {e}")
         return []
 
-@app.get("/api/props/odds")
-def get_player_props_odds(game_date: str):
+@app.get("/api/props/odds/{player_name}")
+def get_player_props_odds(player_name: str):
     """
-    Returns player PTS, REB, and AST props for all players in lineups on a certain date.
+    Returns player PTS, REB, and AST props for a certain player.
     Also includes over/under lines from different bookmakers (platforms).
-    Uses salary-based projected lineups so data is available before tip-off.
     """
-    lineups = fetch_espn_lineups(game_date)
-    if not lineups:
-        return {
-            "error": "No lineups found",
-            "date": game_date,
-            "games": []
-        }
-    
-    def get_player_name(player_name: str) -> str:
-        """
-        Parses player name to not include suffixes (e.g. Jr, III, etc.)
-        """
-        player_name_components = player_name.split(" ")
-        if len(player_name_components) > 2:
-            return player_name_components[0] + " " + player_name_components[1]
-        return player_name
-
-    props: dict[str, dict[str, any]] = {}
-
-    for game in lineups["games"]:
-        for side in ("home_team", "away_team"):
-            team = game.get(side) or {}
-            team_abbrev = team.get("team_abbreviation")
-            starters = team.get("starters") or []
-
-            if not team_abbrev:
-                continue
-
-            team_props: dict[str, any] = {}
-            for player in starters:
-                raw_name = player.get("name", "")
-                player_name = get_player_name(raw_name)
-                player_props = fetch_player_props(player_name)
-                team_props[player_name] = player_props
-
-            props[team_abbrev] = team_props
-
-    return props
-
+    player_props = fetch_player_props(player_name)
+    return player_props
 
 # Standings route
 @app.get("/api/standings")

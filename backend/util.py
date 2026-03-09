@@ -797,6 +797,7 @@ def get_player_props(player_name: str) -> dict[str, Any]:
     Args:
         player_name: The name of the player to get props for.
     """
+    player_name = player_name.replace("-", "")
     player_entity_id = "_".join(player_name.split(" ")).upper() + "_1_NBA"
     odd_ids = (
         f"points-{player_entity_id}-game-ou-over,points-{player_entity_id}-game-ou-under,"
@@ -807,7 +808,6 @@ def get_player_props(player_name: str) -> dict[str, Any]:
 
     try:
         _wait_sportsgameodds_rate_limit()
-        print(url)
         response = requests.get(url)
         _record_sportsgameodds_request()
         data = response.json()
