@@ -5,6 +5,7 @@ import Image from "next/image";
 import ThemeToggle from "./ThemeToggle";
 import { Playfair_Display } from "next/font/google";
 import { usePathname } from "next/navigation";
+import { Activity, BarChart3 } from "lucide-react";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -21,7 +22,7 @@ export default function Navbar() {
     border-b border-slate-800
     transition-all duration-300">
 
-      <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3">
         <Image
           src="/logo2.png"
           alt="Sports Betting"
@@ -34,39 +35,45 @@ export default function Navbar() {
             Sports Betting
           </h1>
         </Link>
-      </div>
+    </div>
 
-      <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex gap-5">
-        <Link
-          href="/"
-          className={`px-5 py-1.5 rounded-full
-          bg-gradient-to-r from-cyan-700/60 to-blue-700/50
-          hover:from-cyan-500 hover:to-blue-500
-          text-white dark:text-slate-200 font-semibold
-          transition-all duration-300
-          ${pathname === "/" ? "scale-[0.85] shadow-[0_0_12px_3px_rgba(0,0,0,0.25)] dark:shadow-[0_0_12px_3px_rgba(255,255,255,0.25)]" : ""}
-          `}
-        >
-          Games
-        </Link>
+    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex gap-10">
+    <Link
+    href="/"
+    className={`relative flex items-center gap-2 font-semibold transition-all duration-200
+    ${pathname === "/"
+        ? "text-blue-600 dark:text-blue-400"
+        : "text-black dark:text-white hover:text-blue-700 dark:hover:text-blue-400"
+    }`}
+    >
+    <Activity size={18} className="translate-y-[1px]" />
+    Games
 
-        <Link
-          href="/props"
-          className={`px-5 py-1.5 rounded-full
-          bg-gradient-to-r from-cyan-700/60 to-blue-700/60
-          hover:from-cyan-500 hover:to-blue-500
-          text-white dark:text-slate-200 font-semibold
-          transition-all duration-300
-          ${pathname === "/props" ? "scale-[0.85] shadow-[0_0_12px_3px_rgba(0,0,0,0.25)] dark:shadow-[0_0_12px_3px_rgba(255,255,255,0.25)]" : ""}
-          `}
-        >
-          Props
-        </Link>
-      </div>
+    {pathname === "/" && (
+        <span className="absolute -bottom-2 left-0 right-0 -mx-6 h-[3px] bg-blue-800 rounded-full"></span>
+    )}
+    </Link>
 
-      <div className="flex items-center justify-end">
+    <Link
+    href="/props"
+    className={`relative flex items-center gap-2 font-semibold transition-all duration-200
+    ${pathname === "/props"
+        ? "text-blue-600 dark:text-blue-400"
+        : "text-black dark:text-white hover:text-blue-700 dark:hover:text-blue-400"
+    }`}
+    >
+    <BarChart3 size={18} className="translate-y-[1px]" />
+    Props
+
+    {pathname === "/props" && (
+        <span className="absolute -bottom-2 left-0 right-0 -mx-6 h-[3px] bg-blue-800 rounded-full"></span>
+    )}
+    </Link>
+    </div>
+
+    <div className="flex items-center justify-end">
         <ThemeToggle />
-      </div>
+    </div>
 
     </nav>
   );
