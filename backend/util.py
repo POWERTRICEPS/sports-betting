@@ -160,7 +160,7 @@ def calculate(
         period = 1
         seconds_remaining = 48 * 60  # 48 minutes = 2880 seconds
         point_diff = 0
-    elif "Final" in status:
+    elif status and "final" in status.lower():
         home_win_prob = 0.0 if home_score < away_score else 100.0
         away_win_prob = 100.0 - home_win_prob
         return home_win_prob, away_win_prob
@@ -194,7 +194,7 @@ def calculate(
 def compute_win_probabilities(games: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     result = {}
     for game in games:
-        game_id = game["game_id"]
+        game_id = str(game["game_id"])  # normalize so merge_gp lookups work
         home_score = game["home_score"]
         away_score = game["away_score"]
         status = game["status"]
@@ -352,9 +352,10 @@ def merge_gp(g: list[dict[str, Any]], p: dict[str, dict[str, float]]) -> list[di
     for game in g:
         game_id = game["game_id"]
         row = {**game, "home_win_prob": None, "away_win_prob": None}
-        if game_id in p:
-            row["home_win_prob"] = p[game_id]["home_win_prob"]
-            row["away_win_prob"] = p[game_id]["away_win_prob"]
+        key = game_id if game_id in p else (str(game_id) if str(game_id) in p else None)
+        if key is not None:
+            row["home_win_prob"] = p[key]["home_win_prob"]
+            row["away_win_prob"] = p[key]["away_win_prob"]
         result.append(row)
     return result
 
@@ -911,7 +912,7 @@ def _l10_by_abbrev_from_espn_standings() -> dict[str, tuple[int, int]]:
     return abbrev_to_l10
 
 
-def fetch_games_from_nba() -> list[dict[str, Any]]:
+def fetch_full_game_stats() -> list[dict[str, Any]]:
     """
     Fetch full game data from ESPN API with all stats.
     Used by /api/games/stats endpoint for detailed statistics.
@@ -936,15 +937,13 @@ def fetch_games_from_nba() -> list[dict[str, Any]]:
     return result
 
 
-def fetch_dashboard_games(date : str = None) -> list[dict[str, Any]]:
+def fetch_dashboard_games() -> list[dict[str, Any]]:
     """
     Fetch lightweight game data from ESPN API for dashboard display.
     Returns only: game_id, status, team names/abbr, records, scores.
     Used by /api/games endpoint.
     """
     url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-    if date:
-        url += f"?dates={date}"
     resp = requests.get(url, timeout=10)
     resp.raise_for_status()
     raw = resp.json()
