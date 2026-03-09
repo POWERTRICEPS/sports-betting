@@ -12,7 +12,7 @@ SeasonFeatureSet = dict[str, float]
 _ESPN_SPLITS_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/athletes/{athlete_id}/splits"
 _ESPN_GAMELOG_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/athletes/{athlete_id}/gamelog"
 _ESPN_CORE_STATS_URL = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/athletes/{athlete_id}/statistics"
-_ESPN_COMMON_V3_STATS_URL = "https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{athlete_id}/stats"
+_ESPN_COMMON_V3_STATS_URL = "https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{athlete_id}/stats" #primary URL
 _TIMEOUT = 8
 
 _cache_date: date | None = None

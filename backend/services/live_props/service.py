@@ -9,12 +9,11 @@ import requests
 
 from util import fetch_espn_lineups
 
-from .features import build_player_feature_context, build_stat_features, parse_minutes
+from .features import build_player_feature_context, build_stat_features
 from .model_runner import predict_remaining
 from .season_stats import (
     current_nba_season_key,
     get_player_season_features,
-    get_team_top_mpg_players,
 )
 from .store import build_snapshot, empty_snapshot
 
@@ -89,10 +88,10 @@ def _projection_row(
     projected_pts: float,
     projected_reb: float,
     projected_ast: float,
-    features: dict[str, dict[str, float]],
-    model_outputs: dict[str, float],
+    features: dict[str, dict[str, float]] | None = None,
+    model_outputs: dict[str, float] | None = None,
 ) -> dict[str, Any]:
-    return {
+    row = {
         "game_id": str(game_id),
         "player_id": str(player_id),
         "espn_player_id": str(player_id),
@@ -103,10 +102,13 @@ def _projection_row(
         "projected_pts": projected_pts,
         "projected_reb": projected_reb,
         "projected_ast": projected_ast,
-        "features": features,
-        "model_outputs": model_outputs,
         "source": "model",
     }
+    if features is not None:
+        row["features"] = features
+    if model_outputs is not None:
+        row["model_outputs"] = model_outputs
+    return row
 
 
 def _to_implied_final(current_value: float, remaining_value: float) -> float:
@@ -149,52 +151,13 @@ def _classify_game_phase(status: str) -> str:
     return "live"
 
 
-def _select_team_candidates(
-    team_abbr: str,
-    starters: list[dict[str, Any]],
-    live_players: dict[str, dict[str, Any]],
-    game_phase: str,
-    season_key: str,
-) -> list[dict[str, Any]]:
-    if starters:
-        return [
-            {
-                "player_id": str(s.get("player_id") or ""),
-                "player_name": s.get("name") or "",
-                "is_starter": True,
-                "mode": "starter",
-            }
-            for s in starters
-        ]
+def _is_fallback_lineup_starter(starter: dict[str, Any]) -> bool:
+    # Salary-based fallback starters include salary/jersey in util.fetch_salary_based_lineups.
+    return "salary" in starter or "jersey" in starter
 
-    if game_phase == "pregame":
-        season_top = get_team_top_mpg_players(season_key, team_abbr, limit=5)
-        return [
-            {
-                "player_id": str(p.get("player_id") or ""),
-                "player_name": p.get("player_name") or "",
-                "is_starter": False,
-                "mode": "fallback_pregame",
-            }
-            for p in season_top
-        ]
 
-    candidates = [
-        p
-        for p in live_players.values()
-        if str(p.get("team_abbr") or "").upper() == str(team_abbr or "").upper()
-    ]
-    candidates.sort(key=lambda p: parse_minutes(str(p.get("minutes") or "0")), reverse=True)
-    return [
-        {
-            "player_id": str(p.get("player_id") or ""),
-            "player_name": p.get("player_name") or "",
-            "is_starter": False,
-            "mode": "fallback_live_or_final",
-            "live_player": p,
-        }
-        for p in candidates[:5]
-    ]
+def _resolve_starter_player_id(starter: dict[str, Any]) -> str:
+    return str(starter.get("espn_player_id") or starter.get("player_id") or "")
 
 
 def _new_debug_stats(target_date: str, season_key: str) -> dict[str, Any]:
@@ -295,57 +258,36 @@ def compute_live_props_snapshot(game_date: str | None = None, debug: bool = Fals
             team = game.get(side) or {}
             team_abbr = str(team.get("team_abbreviation") or "")
             starters = team.get("starters") or []
-            if not team_abbr:
+            if not team_abbr or not starters:
                 if debug and debug_stats is not None:
                     debug_stats["skips"]["missing_team_or_starters"] += 1
                 continue
 
-            candidates = _select_team_candidates(
-                team_abbr=team_abbr,
-                starters=starters,
-                live_players=live_players,
-                game_phase=game_phase,
-                season_key=season_key,
-            )
-            if not candidates:
-                if debug and debug_stats is not None:
-                    debug_stats["skips"]["missing_team_or_starters"] += 1
-                continue
-            if not starters and debug and debug_stats is not None:
-                debug_stats["fallback_candidates_selected"] += len(candidates)
+            team_is_fallback = any(_is_fallback_lineup_starter(s) for s in starters)
+            if debug and debug_stats is not None and team_is_fallback:
+                debug_stats["fallback_candidates_selected"] += len(starters)
                 if game_phase == "pregame":
                     debug_stats["fallback_used_pregame"] += 1
                 else:
                     debug_stats["fallback_used_live_or_final"] += 1
 
             opponent_abbr = opp_map.get(team_abbr, "")
-            for candidate in candidates:
-                is_starter = bool(candidate.get("is_starter"))
+            for starter in starters:
+                is_starter = not _is_fallback_lineup_starter(starter)
                 if debug and debug_stats is not None:
                     if is_starter:
                         debug_stats["starters_total"] += 1
-                player_id = str(candidate.get("player_id") or "")
+                player_id = _resolve_starter_player_id(starter)
                 if not player_id:
                     if debug and debug_stats is not None:
                         debug_stats["skips"]["missing_starter_player_id"] += 1
                     continue
-                live = candidate.get("live_player") if candidate.get("mode") == "fallback_live_or_final" else live_players.get(player_id)
+                live = live_players.get(player_id)
 
-                if candidate.get("mode") == "fallback_pregame":
+                if live is None and no_live_players_for_game:
+                    # Pregame stats fallback only; player selection is now lineup-driven.
                     live = _build_pregame_player_stub(
-                        {"player_id": player_id, "name": candidate.get("player_name") or ""}
-                    )
-                    player_game_ctx = {
-                        **game_context,
-                        "status": "Pregame",
-                        "home_score": 0,
-                        "away_score": 0,
-                        "is_home": team_abbr == game_context.get("home_abbreviation"),
-                    }
-                elif live is None and no_live_players_for_game:
-                    # Pregame fallback: no live boxscore rows yet, use zeroed in-game stats.
-                    live = _build_pregame_player_stub(
-                        {"player_id": player_id, "name": candidate.get("player_name") or ""}
+                        {"player_id": player_id, "name": starter.get("name") or ""}
                     )
                     player_game_ctx = {
                         **game_context,
@@ -368,7 +310,7 @@ def compute_live_props_snapshot(game_date: str | None = None, debug: bool = Fals
                         **game_context,
                         "is_home": team_abbr == game_context.get("home_abbreviation"),
                     }
-                player_name = live.get("player_name") or candidate.get("player_name") or ""
+                player_name = live.get("player_name") or starter.get("name") or ""
                 season_features = get_player_season_features(
                     espn_player_id=player_id,
                     season_key=season_key,
@@ -403,20 +345,28 @@ def compute_live_props_snapshot(game_date: str | None = None, debug: bool = Fals
                         projected_pts=pts,
                         projected_reb=reb,
                         projected_ast=ast,
-                        features={
-                            "base": {k: float(v) for k, v in base_features.items()},
-                            "pts_model": pts_features,
-                            "reb_model": reb_features,
-                            "ast_model": ast_features,
-                        },
-                        model_outputs={
-                            "pts_remaining_raw": float(pts_remaining),
-                            "reb_remaining_raw": float(reb_remaining),
-                            "ast_remaining_raw": float(ast_remaining),
-                            "pts_implied_final": float(pts),
-                            "reb_implied_final": float(reb),
-                            "ast_implied_final": float(ast),
-                        },
+                        features=(
+                            {
+                                "base": {k: float(v) for k, v in base_features.items()},
+                                "pts_model": pts_features,
+                                "reb_model": reb_features,
+                                "ast_model": ast_features,
+                            }
+                            if debug
+                            else None
+                        ),
+                        model_outputs=(
+                            {
+                                "pts_remaining_raw": float(pts_remaining),
+                                "reb_remaining_raw": float(reb_remaining),
+                                "ast_remaining_raw": float(ast_remaining),
+                                "pts_implied_final": float(pts),
+                                "reb_implied_final": float(reb),
+                                "ast_implied_final": float(ast),
+                            }
+                            if debug
+                            else None
+                        ),
                     )
                 )
                 if debug and debug_stats is not None:

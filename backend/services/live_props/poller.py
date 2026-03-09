@@ -14,7 +14,7 @@ async def update_player_props(manager: Any, game_date: str | None = None) -> Non
     await broadcast_props_snapshot(manager, payload)
 
 
-async def props_poll_loop(manager: Any, interval_s: int = 5) -> None:
+async def props_poll_loop(manager: Any, interval_s: int = 30) -> None:
     while True:
         try:
             await update_player_props(manager)

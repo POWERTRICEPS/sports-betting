@@ -28,41 +28,32 @@ class LivePropsServiceTest(unittest.TestCase):
             "season_assists": 6.0,
         },
     )
-    @patch("services.live_props.service.get_team_top_mpg_players")
     @patch("services.live_props.service._summary_for_game")
     @patch("services.live_props.service.fetch_espn_lineups")
     def test_pregame_fallback_projects_starters_when_no_live_players(
         self,
         mock_lineups,
         mock_summary,
-        mock_top_mpg,
         _mock_season,
         _mock_predict,
     ) -> None:
-        def _top_mpg(_season_key: str, team_abbr: str, limit: int = 5):
-            if team_abbr == "LAL":
-                return [
-                    {"player_id": 101, "player_name": "Fallback Home 1", "team_abbr": "LAL", "season_mpg": 34.0},
-                    {"player_id": 102, "player_name": "Fallback Home 2", "team_abbr": "LAL", "season_mpg": 32.0},
-                ][:limit]
-            return [
-                {"player_id": 201, "player_name": "Fallback Away 1", "team_abbr": "DEN", "season_mpg": 35.0},
-                {"player_id": 202, "player_name": "Fallback Away 2", "team_abbr": "DEN", "season_mpg": 31.0},
-            ][:limit]
-
-        mock_top_mpg.side_effect = _top_mpg
-
         mock_lineups.return_value = {
             "games": [
                 {
                     "game_id": "401000001",
                     "home_team": {
                         "team_abbreviation": "LAL",
-                        "starters": [],
+                        "starters": [
+                            {"player_id": "101", "espn_player_id": "101", "name": "Fallback Home 1", "salary": 100, "jersey": "1"},
+                            {"player_id": "102", "espn_player_id": "102", "name": "Fallback Home 2", "salary": 99, "jersey": "2"},
+                        ],
                     },
                     "away_team": {
                         "team_abbreviation": "DEN",
-                        "starters": [],
+                        "starters": [
+                            {"player_id": "201", "espn_player_id": "201", "name": "Fallback Away 1", "salary": 100, "jersey": "1"},
+                            {"player_id": "202", "espn_player_id": "202", "name": "Fallback Away 2", "salary": 99, "jersey": "2"},
+                        ],
                     },
                 }
             ]
@@ -121,8 +112,20 @@ class LivePropsServiceTest(unittest.TestCase):
             "games": [
                 {
                     "game_id": "401810000",
-                    "home_team": {"team_abbreviation": "LAL", "starters": []},
-                    "away_team": {"team_abbreviation": "DEN", "starters": []},
+                    "home_team": {
+                        "team_abbreviation": "LAL",
+                        "starters": [
+                            {"player_id": f"h{i}", "espn_player_id": f"h{i}", "name": f"H{i}", "salary": 100 - i, "jersey": str(i)}
+                            for i in range(5)
+                        ],
+                    },
+                    "away_team": {
+                        "team_abbreviation": "DEN",
+                        "starters": [
+                            {"player_id": f"a{i}", "espn_player_id": f"a{i}", "name": f"A{i}", "salary": 100 - i, "jersey": str(i)}
+                            for i in range(5)
+                        ],
+                    },
                 }
             ]
         }
@@ -186,8 +189,20 @@ class LivePropsServiceTest(unittest.TestCase):
             "games": [
                 {
                     "game_id": "401810001",
-                    "home_team": {"team_abbreviation": "MIN", "starters": []},
-                    "away_team": {"team_abbreviation": "ORL", "starters": []},
+                    "home_team": {
+                        "team_abbreviation": "MIN",
+                        "starters": [
+                            {"player_id": f"fh{i}", "espn_player_id": f"fh{i}", "name": f"FH{i}", "salary": 100 - i, "jersey": str(i)}
+                            for i in range(5)
+                        ],
+                    },
+                    "away_team": {
+                        "team_abbreviation": "ORL",
+                        "starters": [
+                            {"player_id": f"fa{i}", "espn_player_id": f"fa{i}", "name": f"FA{i}", "salary": 100 - i, "jersey": str(i)}
+                            for i in range(5)
+                        ],
+                    },
                 }
             ]
         }
@@ -252,7 +267,7 @@ class LivePropsServiceTest(unittest.TestCase):
                     "game_id": "401810772",
                     "home_team": {
                         "team_abbreviation": "PHI",
-                        "starters": [{"player_id": "4431678", "name": "Tyrese Maxey"}],
+                        "starters": [{"player_id": "4431678", "espn_player_id": "4431678", "name": "Tyrese Maxey"}],
                     },
                     "away_team": {
                         "team_abbreviation": "ATL",
@@ -320,6 +335,174 @@ class LivePropsServiceTest(unittest.TestCase):
         self.assertTrue(row["is_starter"])
         self.assertEqual(payload["debug"]["fallback_used_pregame"], 0)
         self.assertEqual(payload["debug"]["fallback_used_live_or_final"], 0)
+
+    @patch("services.live_props.service.predict_remaining", side_effect=[2.0, 1.0, 1.0])
+    @patch(
+        "services.live_props.service.get_player_season_features",
+        return_value={
+            "season_ppg": 20.0,
+            "season_fga": 15.0,
+            "season_mpg": 32.0,
+            "season_3pa": 5.0,
+            "season_rebounds": 7.0,
+            "season_assists": 6.0,
+        },
+    )
+    @patch("services.live_props.service._summary_for_game")
+    @patch("services.live_props.service.fetch_espn_lineups")
+    def test_prefers_espn_player_id_over_player_id(
+        self,
+        mock_lineups,
+        mock_summary,
+        _mock_season,
+        _mock_predict,
+    ) -> None:
+        mock_lineups.return_value = {
+            "games": [
+                {
+                    "game_id": "401810773",
+                    "home_team": {
+                        "team_abbreviation": "PHI",
+                        "starters": [{"player_id": "legacy-id", "espn_player_id": "4431678", "name": "Tyrese Maxey"}],
+                    },
+                    "away_team": {
+                        "team_abbreviation": "ATL",
+                        "starters": [],
+                    },
+                }
+            ]
+        }
+        labels = [
+            "MIN", "FG", "3PT", "FT", "OREB", "DREB", "REB",
+            "AST", "STL", "BLK", "TO", "PF", "+/-", "PTS"
+        ]
+        stats = [
+            "30:00", "8-16", "2-6", "4-5", "1", "2", "3",
+            "2", "1", "0", "2", "3", "+4", "22"
+        ]
+        mock_summary.return_value = {
+            "header": {
+                "competitions": [
+                    {
+                        "status": {"type": {"shortDetail": "6:00 - 3rd"}},
+                        "competitors": [
+                            {"homeAway": "home", "score": "80", "team": {"abbreviation": "PHI"}},
+                            {"homeAway": "away", "score": "76", "team": {"abbreviation": "ATL"}},
+                        ],
+                    }
+                ]
+            },
+            "boxscore": {
+                "players": [
+                    {
+                        "team": {"abbreviation": "PHI"},
+                        "statistics": [
+                            {
+                                "labels": labels,
+                                "athletes": [
+                                    {
+                                        "athlete": {"id": "4431678", "displayName": "Tyrese Maxey"},
+                                        "stats": stats,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+
+        payload = compute_live_props_snapshot(game_date="20260308", debug=True)
+        self.assertEqual(len(payload["projections"]), 1)
+        row = payload["projections"][0]
+        self.assertEqual(row["player_id"], "4431678")
+        self.assertEqual(row["espn_player_id"], "4431678")
+
+    @patch("services.live_props.service.predict_remaining", side_effect=[4.41, 0.84, 0.83, 4.41, 0.84, 0.83])
+    @patch(
+        "services.live_props.service.get_player_season_features",
+        return_value={
+            "season_ppg": 20.0,
+            "season_fga": 15.0,
+            "season_mpg": 32.0,
+            "season_3pa": 5.0,
+            "season_rebounds": 7.0,
+            "season_assists": 6.0,
+        },
+    )
+    @patch("services.live_props.service._summary_for_game")
+    @patch("services.live_props.service.fetch_espn_lineups")
+    def test_non_debug_payload_omits_feature_blocks(
+        self,
+        mock_lineups,
+        mock_summary,
+        _mock_season,
+        _mock_predict,
+    ) -> None:
+        mock_lineups.return_value = {
+            "games": [
+                {
+                    "game_id": "401810772",
+                    "home_team": {
+                        "team_abbreviation": "PHI",
+                        "starters": [{"player_id": "4431678", "espn_player_id": "4431678", "name": "Tyrese Maxey"}],
+                    },
+                    "away_team": {
+                        "team_abbreviation": "ATL",
+                        "starters": [],
+                    },
+                }
+            ]
+        }
+        labels = [
+            "MIN", "FG", "3PT", "FT", "OREB", "DREB", "REB",
+            "AST", "STL", "BLK", "TO", "PF", "+/-", "PTS"
+        ]
+        stats = [
+            "30:00", "8-16", "2-6", "4-5", "1", "2", "3",
+            "2", "1", "0", "2", "3", "+4", "22"
+        ]
+        mock_summary.return_value = {
+            "header": {
+                "competitions": [
+                    {
+                        "status": {"type": {"shortDetail": "6:00 - 3rd"}},
+                        "competitors": [
+                            {"homeAway": "home", "score": "80", "team": {"abbreviation": "PHI"}},
+                            {"homeAway": "away", "score": "76", "team": {"abbreviation": "ATL"}},
+                        ],
+                    }
+                ]
+            },
+            "boxscore": {
+                "players": [
+                    {
+                        "team": {"abbreviation": "PHI"},
+                        "statistics": [
+                            {
+                                "labels": labels,
+                                "athletes": [
+                                    {
+                                        "athlete": {"id": "4431678", "displayName": "Tyrese Maxey"},
+                                        "stats": stats,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+
+        prod_payload = compute_live_props_snapshot(game_date="20260308", debug=False)
+        debug_payload = compute_live_props_snapshot(game_date="20260308", debug=True)
+
+        self.assertEqual(len(prod_payload["projections"]), 1)
+        self.assertEqual(len(debug_payload["projections"]), 1)
+        self.assertNotIn("features", prod_payload["projections"][0])
+        self.assertNotIn("model_outputs", prod_payload["projections"][0])
+        self.assertIn("features", debug_payload["projections"][0])
+        self.assertIn("model_outputs", debug_payload["projections"][0])
 
 
 if __name__ == "__main__":
