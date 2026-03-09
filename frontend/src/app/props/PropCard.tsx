@@ -44,7 +44,39 @@ function FloorIndicator({ on }: { on: boolean }) {
   );
 }
 
-export default function PlayerPropCard({ data }: { data: Prop }) {
+function HighlightedName({ name, query }: { name: string; query?: string }) {
+  const trimmedQuery = query?.trim() ?? "";
+  if (!trimmedQuery) {
+    return <>{name}</>;
+  }
+
+  const lowerName = name.toLowerCase();
+  const lowerQuery = trimmedQuery.toLowerCase();
+  const start = lowerName.indexOf(lowerQuery);
+
+  if (start === -1) {
+    return <>{name}</>;
+  }
+
+  const end = start + trimmedQuery.length;
+  return (
+    <>
+      {name.slice(0, start)}
+      <span className="rounded bg-emerald-100 px-1 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+        {name.slice(start, end)}
+      </span>
+      {name.slice(end)}
+    </>
+  );
+}
+
+export default function PlayerPropCard({
+  data,
+  highlightQuery,
+}: {
+  data: Prop;
+  highlightQuery?: string;
+}) {
   const [imgFailed, setImgFailed] = useState(false);
   const headshotUrl = getHeadshotUrl(data.espnPlayerId);
   const initials = useMemo(
@@ -79,7 +111,7 @@ export default function PlayerPropCard({ data }: { data: Prop }) {
           )}
           <div>
             <div className="text-lg font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
-              {data.player}
+              <HighlightedName name={data.player} query={highlightQuery} />
             </div>
             <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               {data.team} vs {data.opponent}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import moonSymbol from "../image/moon_symbol.png";
 import sunSymbol from "../image/sun_symbol.png";
@@ -32,13 +32,19 @@ export default function ThemeToggle() {
       return "system";
     }
   });
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
+    if (!mounted) return;
     applyTheme(theme);
-  }, [theme]);
+  }, [mounted, theme]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!mounted || typeof window === "undefined") return;
     const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
     const onChange = () => {
       if (theme === "system") {
@@ -48,7 +54,7 @@ export default function ThemeToggle() {
 
     mql?.addEventListener?.("change", onChange);
     return () => mql?.removeEventListener?.("change", onChange);
-  }, [theme]);
+  }, [mounted, theme]);
 
   function toggle() {
     const resolved = resolveTheme(theme);
@@ -64,6 +70,26 @@ export default function ThemeToggle() {
   const resolved = resolveTheme(theme);
   const pressed = resolved === "dark";
   const isDark = resolved === "dark";
+
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        aria-label="Toggle dark mode"
+        aria-pressed={false}
+        className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 flex items-center justify-center"
+      >
+        <span className="sr-only">Toggle dark mode</span>
+        <Image
+          src={sunSymbol}
+          alt="Toggle dark mode"
+          width={24}
+          height={24}
+          className="h-6 w-6"
+        />
+      </button>
+    );
+  }
 
   return (
     <button
@@ -84,4 +110,3 @@ export default function ThemeToggle() {
     </button>
   );
 }
-
