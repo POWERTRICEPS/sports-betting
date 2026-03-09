@@ -503,6 +503,7 @@ def _fetch_team_roster(team_abbreviation: str) -> list[dict[str, Any]]:
             "position": position.get("abbreviation", ""),
             "salary": salary,
             "player_id": str(athlete.get("id", "")),
+            "espn_player_id": str(athlete.get("id", "")),
             "jersey": athlete.get("jersey", ""),
         })
 
@@ -534,6 +535,11 @@ def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any
         each with keys: ``name``, ``position``, ``salary``, ``player_id``,
         ``jersey``.
     """
+    # Prefer players with known positive salary; ESPN can return 0 for missing contract data.
+    # Only fall back to zero-salary players if a team has fewer than 5 positive-salary players.
+    positive_salary = [p for p in roster if float(p.get("salary") or 0) > 0]
+    candidate_pool = positive_salary if len(positive_salary) >= 5 else list(roster)
+
     # Position buckets: how many starters we need per position group
     needs = {"G": 2, "F": 2, "C": 1}
     starters: list[dict[str, Any]] = []
@@ -542,7 +548,7 @@ def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any
     # First pass: fill each position bucket with highest-paid players
     for pos, count in needs.items():
         candidates = [
-            p for p in roster
+            p for p in candidate_pool
             if p["position"] == pos and p["player_id"] not in used_ids
         ]
         for player in candidates[:count]:
@@ -551,7 +557,7 @@ def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any
 
     # Second pass: if we have fewer than 5, fill with highest-paid remaining
     if len(starters) < 5:
-        remaining = [p for p in roster if p["player_id"] not in used_ids]
+        remaining = [p for p in candidate_pool if p["player_id"] not in used_ids]
         for player in remaining:
             if len(starters) >= 5:
                 break
@@ -563,17 +569,12 @@ def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any
 
 def fetch_salary_based_lineups(game_date: str) -> dict[str, Any]:
     """
-    Build projected starting lineups using the highest-paid players per position.
-
-    Instead of waiting for ESPN to publish actual starters (which happens
-    only around tip-off), this function uses each team's roster and current
-    contract salary data to project a starting five: the top-paid Guard (×2),
-    Forward (×2), and Center (×1) who are active and not listed as "Out".
+    Build hybrid starting lineups using ESPN posted starters with salary-based fallback.
 
     Workflow:
         1. Fetch the ESPN scoreboard for ``game_date`` to discover games.
-        2. For each team in those games, fetch the full roster (cached 1 hr).
-        3. Pick the top-paid player per position slot as the projected starter.
+        2. For each game, fetch ESPN summary and extract posted starters when available.
+        3. For teams missing posted starters, fallback to salary-based projected starters.
 
     Args:
         game_date: Date string in ``YYYYMMDD`` format (e.g. ``"20260307"``).
@@ -581,7 +582,7 @@ def fetch_salary_based_lineups(game_date: str) -> dict[str, Any]:
     Returns:
             {
                 "date": "20260307",
-                "lineup_status": "projected",
+                "lineup_status": "confirmed" | "projected",
                 "method": "salary_based",
                 "games": [
                     {
@@ -590,7 +591,7 @@ def fetch_salary_based_lineups(game_date: str) -> dict[str, Any]:
                             "team_name": "...",
                             "team_abbreviation": "...",
                             "starters": [ { "name", "position", "salary",
-                                            "player_id", "jersey" }, ... ]
+                                            "player_id", "espn_player_id", "jersey" }, ... ]
                         },
                         "away_team": { ... }
                     },
@@ -600,6 +601,7 @@ def fetch_salary_based_lineups(game_date: str) -> dict[str, Any]:
             }
     """
     _ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    _ESPN_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
     _TIMEOUT = 10
 
     # 1. Discover games for the requested date
@@ -628,41 +630,109 @@ def fetch_salary_based_lineups(game_date: str) -> dict[str, Any]:
             "total_games": 0,
         }
 
-    # 2. For each game, fetch rosters and build projected lineups
+    # 2. For each game, try posted starters, then fallback per team
     games: list[dict[str, Any]] = []
+    any_posted_starters = False
 
     for event in events:
         game_id = event.get("id", "")
         competition = (event.get("competitions") or [{}])[0]
 
-        game_entry: dict[str, Any] = {"game_id": game_id}
+        team_map: dict[str, dict[str, Any]] = {}
+        posted_starters_by_side: dict[str, list[dict[str, Any]]] = {}
 
         for competitor in competition.get("competitors", []):
             side = competitor.get("homeAway", "")  # "home" or "away"
             team = competitor.get("team", {})
             team_name = team.get("displayName", "")
             team_abbrev = team.get("abbreviation", "")
+            team_map[side] = {
+                "team_name": team_name,
+                "team_abbreviation": team_abbrev,
+            }
+            posted_starters_by_side[side] = []
 
-            # Fetch roster and pick starters
-            roster = _fetch_team_roster(team_abbrev)
-            starters = _pick_starters_by_salary(roster)
+        try:
+            summary_resp = requests.get(
+                _ESPN_SUMMARY_URL,
+                params={"event": game_id},
+                timeout=_TIMEOUT,
+            )
+            summary_resp.raise_for_status()
+            summary = summary_resp.json()
+            boxscore_players = summary.get("boxscore", {}).get("players", [])
 
-            # Format starters for output (drop salary from public response, keep for transparency)
-            formatted_starters = [
-                {
-                    "name": p["name"],
-                    "position": p["position"],
-                    "salary": p["salary"],
-                    "player_id": p["player_id"],
-                    "jersey": p["jersey"],
-                }
-                for p in starters
-            ]
+            side_by_abbrev: dict[str, str] = {}
+            for side, info in team_map.items():
+                side_by_abbrev[info.get("team_abbreviation", "")] = side
+
+            for player_group in boxscore_players:
+                group_team = player_group.get("team", {})
+                abbrev = group_team.get("abbreviation", "")
+                side = side_by_abbrev.get(abbrev)
+                if side is None:
+                    continue
+
+                seen_ids: set[str] = set()
+                for stat_group in player_group.get("statistics") or []:
+                    athletes = stat_group.get("athletes") or []
+                    for athlete_row in athletes:
+                        if not athlete_row.get("starter"):
+                            continue
+                        athlete = athlete_row.get("athlete", {})
+                        player_id = str(athlete.get("id", ""))
+                        if not player_id or player_id in seen_ids:
+                            continue
+                        position = athlete.get("position", {})
+                        posted_starters_by_side[side].append(
+                            {
+                                "name": athlete.get("displayName", "Unknown"),
+                                "position": position.get("abbreviation", ""),
+                                "player_id": player_id,
+                                "espn_player_id": player_id,
+                            }
+                        )
+                        seen_ids.add(player_id)
+                        if len(posted_starters_by_side[side]) >= 5:
+                            break
+                    if len(posted_starters_by_side[side]) >= 5:
+                        break
+        except Exception as e:
+            print(f"[fetch_salary_based_lineups] summary fetch failed for game {game_id}: {e}")
+
+        game_entry: dict[str, Any] = {"game_id": game_id}
+        for side in ("home", "away"):
+            info = team_map.get(side, {})
+            starters = posted_starters_by_side.get(side, [])
+            using_fallback = len(starters) == 0
+
+            if not using_fallback:
+                any_posted_starters = True
+                formatted_starters = starters
+            else:
+                team_abbrev = info.get("team_abbreviation", "")
+                roster = _fetch_team_roster(team_abbrev)
+                salary_starters = _pick_starters_by_salary(roster)
+                print(
+                    f"[fetch_salary_based_lineups] fallback=salary side={side} "
+                    f"game_id={game_id} team={team_abbrev} starters={len(salary_starters)}"
+                )
+                formatted_starters = [
+                    {
+                        "name": p["name"],
+                        "position": p["position"],
+                        "salary": p["salary"],
+                        "player_id": p["player_id"],
+                        "espn_player_id": p.get("espn_player_id") or p["player_id"],
+                        "jersey": p["jersey"],
+                    }
+                    for p in salary_starters
+                ]
 
             side_key = "home_team" if side == "home" else "away_team"
             game_entry[side_key] = {
-                "team_name": team_name,
-                "team_abbreviation": team_abbrev,
+                "team_name": info.get("team_name", ""),
+                "team_abbreviation": info.get("team_abbreviation", ""),
                 "starters": formatted_starters,
             }
 
@@ -670,12 +740,22 @@ def fetch_salary_based_lineups(game_date: str) -> dict[str, Any]:
 
     return {
         "date": game_date,
-        "lineup_status": "projected",
+        "lineup_status": "confirmed" if any_posted_starters else "projected",
         "method": "salary_based",
-        "message": "Lineups are projected based on highest-paid active players per position (2G, 2F, 1C).",
+        "message": (
+            "Lineups include ESPN-posted starters when available; missing teams fallback to "
+            "salary-based projected starters."
+        ),
         "games": games,
         "total_games": len(games),
     }
+
+
+def fetch_espn_lineups(game_date: str) -> dict[str, Any]:
+    """
+    Backward-compatible alias for callers that still reference the prior lineup API name.
+    """
+    return fetch_salary_based_lineups(game_date)
 
 # deque to keep track of timestamps of the last 10 requests
 _SPORTSGAMEODDS_REQUEST_TIMES: deque[float] = deque(maxlen=10)

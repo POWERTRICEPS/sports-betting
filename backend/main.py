@@ -7,14 +7,10 @@ import requests
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from datetime import datetime
-
 from util import (
     compute_win_probabilities,
-    parse_game_data,
-    parse_dashboard_game_data,
     merge_gp,
-    fetch_salary_based_lineups,
+    fetch_espn_lineups,
     fetch_standings_from_espn,
     fetch_full_game_stats,
     fetch_dashboard_games,
@@ -30,6 +26,10 @@ from database import (
     get_historical_team_stats,
     is_game_final,
 )
+from database import fetch_game_history, save_completed_games_to_db
+from services.live_props.poller import props_poll_loop
+from services.live_props.service import compute_live_props_snapshot
+from services.live_props.store import get_snapshot, set_snapshot
 
 async def update_games_and_probabilities():
     """
@@ -236,7 +236,7 @@ manager = ConnectionManager()
 async def lifespan(app: FastAPI):
     dashboard_task = asyncio.create_task(poll_loop())
     detailed_task = asyncio.create_task(detailed_poll_loop())
-    props_task = asyncio.create_task(props_poll_loop())
+    props_task = asyncio.create_task(props_poll_loop(manager))
     try:
         yield
     finally:
@@ -352,14 +352,14 @@ async def games_by_date(date: str):
         print(f"Error in games by date: {e}")
         return []
 
-@app.get("/api/props")
-def get_player_props(game_date: str):
+@app.get("/api/props/odds")
+def get_player_props_odds(game_date: str):
     """
     Returns player PTS, REB, and AST props for all players in lineups on a certain date.
     Also includes over/under lines from different bookmakers (platforms).
     Uses salary-based projected lineups so data is available before tip-off.
     """
-    lineups = fetch_salary_based_lineups(game_date)
+    lineups = fetch_espn_lineups(game_date)
     if not lineups:
         return {
             "error": "No lineups found",
@@ -391,7 +391,7 @@ def get_player_props(game_date: str):
             for player in starters:
                 raw_name = player.get("name", "")
                 player_name = get_player_name(raw_name)
-                player_props = get_player_props(player_name)
+                player_props = fetch_player_props(player_name)
                 team_props[player_name] = player_props
 
             props[team_abbrev] = team_props
@@ -422,7 +422,7 @@ def get_lineups(game_date: str):
         }
 
     try:
-        return fetch_salary_based_lineups(game_date)
+        return fetch_espn_lineups(game_date)
     except requests.exceptions.Timeout:
         return {
             "error": "Request timeout. ESPN may be slow or unavailable.",
@@ -500,67 +500,19 @@ def single_game_stats(game_id: str):
         print(f"Error fetching game stats: {e}")
         return {"error": "Failed to fetch game stats"}, 500
     
-def _build_mock_props_payload() -> dict[str, Any]:
-    return {
-        "updated_at": datetime.utcnow().isoformat() + "Z",
-        "projections": [
-            {
-                "game_id": "401000001",
-                "player_id": "203999",
-                "player_name": "Nikola Jokic",
-                "team_abbr": "DEN",
-                "opponent_abbr": "LAL",
-                "is_starter": True,
-                "projected_pts": 28.4,
-                "projected_reb": 12.1,
-                "projected_ast": 9.3,
-                "source": "mock",
-            },
-            {
-                "game_id": "401000001",
-                "player_id": "2544",
-                "player_name": "LeBron James",
-                "team_abbr": "LAL",
-                "opponent_abbr": "DEN",
-                "is_starter": True,
-                "projected_pts": 26.7,
-                "projected_reb": 7.8,
-                "projected_ast": 8.0,
-                "source": "mock",
-            },
-        ],
-    }
-
-
-async def update_player_props():
-    """
-    Placeholder updater.
-    """
-    payload = _build_mock_props_payload()
-    app_state.PROPS_SNAPSHOT_STATE.clear()
-    app_state.PROPS_SNAPSHOT_STATE.update(payload)
-
-    await manager.broadcast_to_topic("props", payload)
-
-
-async def props_poll_loop():
-    """Poll/update props every 5 seconds."""
-    while True:
-        try:
-            await update_player_props()
-        except Exception as e:
-            print(f"props poll loop error: {e}")
-        await asyncio.sleep(5)
-
-
 @app.get("/api/props")
-def props():
+def props(debug: bool = False):
     """
-    Returns current props snapshot (mock for now).
+    Returns current live props snapshot.
     """
-    if not app_state.PROPS_SNAPSHOT_STATE.get("projections"):
-        app_state.PROPS_SNAPSHOT_STATE.update(_build_mock_props_payload())
-    return app_state.PROPS_SNAPSHOT_STATE
+    if debug:
+        return compute_live_props_snapshot(debug=True)
+
+    snapshot = get_snapshot()
+    if not snapshot.get("projections"):
+        snapshot = compute_live_props_snapshot()
+        set_snapshot(snapshot)
+    return snapshot
 
   
 @app.websocket("/ws")

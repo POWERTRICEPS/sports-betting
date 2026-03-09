@@ -1,28 +1,52 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { ConnectionStatus, PropsSnapshotResponse } from "@/app/types";
 import PlayerPropCard from "./PropCard";
-import { mockProps } from "./mock";
+
+const BACKEND_URL = "pj09-sports-betting.onrender.com";
+// const BACKEND_URL = "localhost:8000";
+const isLocal =
+  BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
+const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
+const PROPS_API_URL = isLocal
+  ? `http://${BACKEND_URL}/api/props`
+  : `https://${BACKEND_URL}/api/props`;
+const PROPS_TOPIC = "props";
+
+function isPropsSnapshotResponse(payload: unknown): payload is PropsSnapshotResponse {
+  if (!payload || typeof payload !== "object") return false;
+  const obj = payload as Record<string, unknown>;
+  if (!Array.isArray(obj.projections)) return false;
+  return obj.projections.every((row) => row && typeof row === "object");
+}
 
 export default function PropsPageClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const [snapshot, setSnapshot] = useState<PropsSnapshotResponse>({
+    updated_at: null,
+    projections: [],
+  });
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const uniqueTeams = useMemo(() => {
-    const teams = mockProps.map((p) => p.team);
+    const teams = snapshot.projections.map((p) => p.team_abbr);
     return Array.from(new Set(teams)).sort();
-  }, []);
+  }, [snapshot.projections]);
 
   const teamParam = searchParams.get("team");
   const sortParam = searchParams.get("sort");
   const queryParam = searchParams.get("q") ?? "";
 
-  const [selectedTeam, setSelectedTeam] = useState<string>(() =>
-    teamParam && (teamParam === "All" || uniqueTeams.includes(teamParam))
-      ? teamParam
-      : "All",
+  const [selectedTeam, setSelectedTeam] = useState<string>(
+    () => (teamParam ? teamParam : "All"),
   );
   const [selectedCategory, setSelectedCategory] = useState<string>(() =>
     sortParam && ["All", "PTS", "REB", "AST"].includes(sortParam)
@@ -38,6 +62,12 @@ export default function PropsPageClient() {
     }, 200);
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (selectedTeam !== "All" && !uniqueTeams.includes(selectedTeam)) {
+      setSelectedTeam("All");
+    }
+  }, [selectedTeam, uniqueTeams]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -57,29 +87,104 @@ export default function PropsPageClient() {
     }
   }, [debouncedQuery, pathname, router, searchParams, selectedCategory, selectedTeam]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchInitialProps() {
+      setIsLoading(true);
+      try {
+        const res = await fetch(PROPS_API_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (mounted && isPropsSnapshotResponse(data)) {
+          setSnapshot(data);
+          setError(null);
+        }
+      } catch (e) {
+        console.error("Failed to fetch initial props snapshot:", e);
+        if (mounted) {
+          setError("Failed to fetch props snapshot");
+          setSnapshot({ updated_at: null, projections: [] });
+        }
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    }
+
+    fetchInitialProps();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+    setConnectionStatus("connecting");
+
+    ws.onopen = () => {
+      setConnectionStatus("connected");
+      setError(null);
+      ws.send(JSON.stringify({ action: "subscribe", topic: PROPS_TOPIC }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data && typeof data === "object" && "ok" in data) {
+          return;
+        }
+        if (isPropsSnapshotResponse(data)) {
+          setSnapshot(data);
+        }
+      } catch (e) {
+        console.error("Failed to parse props websocket message:", e);
+      }
+    };
+
+    ws.onerror = (event) => {
+      console.error("Props websocket error:", event);
+      setConnectionStatus("error");
+      setError("WebSocket connection error");
+    };
+
+    ws.onclose = () => {
+      setConnectionStatus("disconnected");
+    };
+
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "unsubscribe", topic: PROPS_TOPIC }));
+      }
+      ws.close();
+      wsRef.current = null;
+    };
+  }, []);
+
   const filteredProps = useMemo(() => {
-    let result = [...mockProps];
+    let result = [...snapshot.projections];
     const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
     if (selectedTeam !== "All") {
-      result = result.filter((p) => p.team === selectedTeam);
+      result = result.filter((p) => p.team_abbr === selectedTeam);
     }
 
     if (normalizedQuery) {
       result = result.filter((p) =>
-        p.player.toLowerCase().includes(normalizedQuery),
+        p.player_name.toLowerCase().includes(normalizedQuery),
       );
     }
 
     if (selectedCategory !== "All") {
       result.sort((a, b) => {
-        const key = selectedCategory.toLowerCase() as "pts" | "reb" | "ast";
-        return b.projected[key] - a.projected[key];
+        if (selectedCategory === "PTS") return b.projected_pts - a.projected_pts;
+        if (selectedCategory === "REB") return b.projected_reb - a.projected_reb;
+        return b.projected_ast - a.projected_ast;
       });
     }
 
     return result;
-  }, [selectedTeam, selectedCategory, debouncedQuery]);
+  }, [snapshot.projections, selectedTeam, selectedCategory, debouncedQuery]);
 
   const clearFilters = () => {
     setSelectedTeam("All");
@@ -89,24 +194,13 @@ export default function PropsPageClient() {
 
   const hasActiveFilters =
     selectedTeam !== "All" || selectedCategory !== "All" || searchQuery.trim() !== "";
-  const totalProps = mockProps.length;
+  const totalProps = snapshot.projections.length;
   const visibleProps = filteredProps.length;
   const trimmedSearchQuery = searchQuery.trim();
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6 pt-20">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
-              Live Player Props
-            </h1>
-            <p className="mt-1 text-zinc-600 dark:text-zinc-300">
-              Check out today&apos;s player props and predictions
-            </p>
-          </div>
-        </div>
-
         <div className="mt-8 flex flex-col gap-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 shadow-sm md:flex-row md:items-center">
           <div className="flex flex-col gap-1.5">
             <label className="font-semibold uppercase text-neutral-950 dark:text-zinc-100">
@@ -140,7 +234,7 @@ export default function PropsPageClient() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="font-semibold uppercase text-emerald-600 dark:text-emerald-400">
+            <label className="font-semibold uppercase text-blue-700 dark:text-blue-400">
               Sort By Category
             </label>
             <div className="flex gap-2">
@@ -150,7 +244,7 @@ export default function PropsPageClient() {
                   onClick={() => setSelectedCategory(cat)}
                   className={`h-10 rounded-lg px-4 text-sm font-medium transition-colors ${
                     selectedCategory === cat
-                      ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500"
+                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500"
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   }`}
                 >
@@ -176,10 +270,14 @@ export default function PropsPageClient() {
           <div className="col-span-full text-sm text-zinc-600 dark:text-zinc-300">
             Showing {visibleProps} of {totalProps} players
           </div>
-          {filteredProps.length > 0 ? (
+          {isLoading ? (
+            <div className="col-span-full py-12 text-center text-zinc-500 dark:text-zinc-400">
+              Loading props...
+            </div>
+          ) : filteredProps.length > 0 ? (
             filteredProps.map((player) => (
               <PlayerPropCard
-                key={`${player.player}-${player.team}`}
+                key={`${player.game_id}-${player.player_id}`}
                 data={player}
                 highlightQuery={debouncedQuery}
               />
@@ -202,6 +300,16 @@ export default function PropsPageClient() {
               )}
             </div>
           )}
+        </div>
+
+        <div className="mt-8 text-xs text-zinc-500 dark:text-zinc-400">
+          <p>
+            Status: {connectionStatus}
+            {snapshot.updated_at
+              ? ` • Updated ${new Date(snapshot.updated_at).toLocaleTimeString()}`
+              : ""}
+          </p>
+          {error && <p className="mt-1 text-red-500">{error}</p>}
         </div>
       </div>
     </main>
