@@ -10,14 +10,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from util import (
     compute_win_probabilities,
     merge_gp,
-    fetch_espn_lineups,
+    fetch_salary_based_lineups,
     fetch_standings_from_espn,
-    fetch_games_from_nba,
+    fetch_full_game_stats,
     fetch_dashboard_games,
     get_player_props as fetch_player_props,
 
 )
 import state as app_state
+from datetime import date as date_type, datetime
+from database import (
+    fetch_game_history,
+    save_completed_games_to_db,
+    past_game_row_to_dashboard_game,
+    get_historical_team_stats,
+    is_game_final,
+)
 from database import fetch_game_history, save_completed_games_to_db
 from services.live_props.poller import props_poll_loop
 from services.live_props.service import compute_live_props_snapshot
@@ -45,23 +53,24 @@ async def update_games_and_probabilities():
     # Broadcast to games dashboard
     await manager.broadcast_to_topic("games", result)
 
-    # Persist any completed games to the database
-    await save_completed_games_to_db(result)
+    # Only add games if they are final and not already saved
+    newly_final = [g for g in result if is_game_final(g) and g["game_id"] not in app_state.SAVED_FINAL_GAME_IDS]
 
-    """
-    # Broadcast to singel gameID (todo: remove and create separate function to send per game stats needed)
-    for game in result:
-        game_id = game.get("game_id")
-        if game_id:
-            topic = f"game:{game_id}"
-            topic_targets = manager.topic_connection_labels(topic)
-            if topic_targets:
-                print(
-                    f"[broadcast] topic={topic} payload=GameWithProbability "
-                    f"subscribers={len(topic_targets)} targets={topic_targets}"
-                )
-            await manager.broadcast_to_topic(topic, game)
-    """
+    if newly_final:
+        # get full game stats
+        g = fetch_full_game_stats()
+        probs = compute_win_probabilities(g)
+        all_games_stats = merge_gp(g, probs)
+        newly_final_ids = {str(g["game_id"]) for g in newly_final}
+        
+        # save full game stats only for newly final games
+        to_save = [m for m in all_games_stats if str(m.get("game_id")) in newly_final_ids]
+        print(f"to_save: {to_save}")
+        await save_completed_games_to_db(to_save)
+
+        # update in-memory store with finished game IDs
+        for g in newly_final:
+            app_state.SAVED_FINAL_GAME_IDS.add(g["game_id"])
 
 async def update_subscribed_game_stats():
     """
@@ -73,7 +82,7 @@ async def update_subscribed_game_stats():
         return
     try:
         # Fetch full detailed game stats
-        games = fetch_games_from_nba()
+        games = fetch_full_game_stats()
 
         # Compute win probabilities
         probabilities = compute_win_probabilities(games)
@@ -294,22 +303,51 @@ def games():
     
     return merge_gp(g, p)
 
+def _parse_date_param(value: str) -> date_type | None:
+    """Parse date path param; accept YYYY-MM-DD or YYYYMMDD. Returns date or None."""
+    if not value or not value.strip():
+        return None
+    value = value.strip()
+    for fmt in ("%Y-%m-%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
 @app.get("/api/games/{date}")
-def games(date: str):
+async def games_by_date(date: str):
     """
-    Returns games on date {date} with dashboard-viewable data only:
-    - game_id, status
-    - team names, abbreviations, records (wins/losses)
-    - current scores
-    - win probabilities (if historic, always 100/0)
-    
-    Data is from in-memory store updated every 5s by background poll.
-    Gracefully handles no available games by returning empty list.
+    Returns games on date {date} with dashboard-viewable data only.
+    - If date is today: fetches from ESPN (live/upcoming).
+    - If date is not today: fetches from database (completed games only).
     """
     try:
-        g = fetch_dashboard_games(date)
-        p = compute_win_probabilities(g)
-        return merge_gp(g, p)
+        parsed = _parse_date_param(date)
+        if parsed is None:
+            return []
+        is_today = parsed == date_type.today()
+        date_yyyy_mm_dd = parsed.isoformat()
+
+        if is_today:
+            g = fetch_dashboard_games()
+            p = compute_win_probabilities(g)
+            return merge_gp(g, p)
+        else:
+            days = await fetch_game_history(order="asc", date=date_yyyy_mm_dd)
+            if not days or not days[0].get("games"):
+                return []
+            rows = days[0]["games"]
+            g = [past_game_row_to_dashboard_game(row) for row in rows]
+            p = {
+                str(row["past_game_id"]): {
+                    "home_win_prob": float(row.get("home_win_probability") or 0),
+                    "away_win_prob": float(row.get("away_win_probability") or 0),
+                }
+                for row in rows
+            }
+            return merge_gp(g, p)
     except Exception as e:
         print(f"Error in games by date: {e}")
         return []
@@ -319,8 +357,9 @@ def get_player_props_odds(game_date: str):
     """
     Returns player PTS, REB, and AST props for all players in lineups on a certain date.
     Also includes over/under lines from different bookmakers (platforms).
+    Uses salary-based projected lineups so data is available before tip-off.
     """
-    lineups = fetch_espn_lineups(game_date)
+    lineups = fetch_salary_based_lineups(game_date)
     if not lineups:
         return {
             "error": "No lineups found",
@@ -383,7 +422,7 @@ def get_lineups(game_date: str):
         }
 
     try:
-        return fetch_espn_lineups(game_date)
+        return fetch_salary_based_lineups(game_date)
     except requests.exceptions.Timeout:
         return {
             "error": "Request timeout. ESPN may be slow or unavailable.",
@@ -436,14 +475,17 @@ def single_game_stats(game_id: str):
     """
     # Check if game exists in dashboard store first
     g_dashboard = list(app_state.GAMES_STATE)
-    game_exists = any(game["game_id"] == game_id for game in g_dashboard)
+    game_today = any(game["game_id"] == game_id for game in g_dashboard)
     
-    if not game_exists:
-        return {"error": "Invalid game_id"}, 404
+    if not game_today:
+        hist = get_historical_team_stats(game_id)
+        if not hist:
+            return {"error": "Game not found"}, 404
+        return hist
     
     # Fetch full stats for this specific game
     try:
-        g_full = fetch_games_from_nba()
+        g_full = fetch_full_game_stats()
         p = compute_win_probabilities(g_full)
         
         target = next((game for game in g_full if game["game_id"] == game_id), None)
@@ -452,6 +494,7 @@ def single_game_stats(game_id: str):
             return {"error": "Invalid game_id"}, 404
         
         result = merge_gp([target], p)
+        print(result[0])
         return result[0]
     except Exception as e:
         print(f"Error fetching game stats: {e}")

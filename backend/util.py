@@ -160,7 +160,7 @@ def calculate(
         period = 1
         seconds_remaining = 48 * 60  # 48 minutes = 2880 seconds
         point_diff = 0
-    elif "Final" in status:
+    elif status and "final" in status.lower():
         home_win_prob = 0.0 if home_score < away_score else 100.0
         away_win_prob = 100.0 - home_win_prob
         return home_win_prob, away_win_prob
@@ -194,7 +194,7 @@ def calculate(
 def compute_win_probabilities(games: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     result = {}
     for game in games:
-        game_id = game["game_id"]
+        game_id = str(game["game_id"])  # normalize so merge_gp lookups work
         home_score = game["home_score"]
         away_score = game["away_score"]
         status = game["status"]
@@ -352,9 +352,10 @@ def merge_gp(g: list[dict[str, Any]], p: dict[str, dict[str, float]]) -> list[di
     for game in g:
         game_id = game["game_id"]
         row = {**game, "home_win_prob": None, "away_win_prob": None}
-        if game_id in p:
-            row["home_win_prob"] = p[game_id]["home_win_prob"]
-            row["away_win_prob"] = p[game_id]["away_win_prob"]
+        key = game_id if game_id in p else (str(game_id) if str(game_id) in p else None)
+        if key is not None:
+            row["home_win_prob"] = p[key]["home_win_prob"]
+            row["away_win_prob"] = p[key]["away_win_prob"]
         result.append(row)
     return result
 
@@ -420,138 +421,261 @@ def parse_dashboard_game_data(event: dict[str, Any]) -> dict[str, Any] | None:
         "away_score": a["score"],
     }
 
-def fetch_espn_lineups(game_date: str) -> dict[str, Any]:
-    """
-    Fetch starting lineup data from the ESPN API for a given date.
+# ── Salary-based starting lineups ─────────────────────────────────────
+# ESPN roster API team slug mapping (abbreviation -> ESPN team slug used in URL)
+_ESPN_TEAM_SLUGS: dict[str, str] = {
+    "ATL": "atl", "BOS": "bos", "BKN": "bkn", "CHA": "cha",
+    "CHI": "chi", "CLE": "cle", "DAL": "dal", "DEN": "den",
+    "DET": "det", "GSW": "gs",  "HOU": "hou", "IND": "ind",
+    "LAC": "lac", "LAL": "lal", "MEM": "mem", "MIA": "mia",
+    "MIL": "mil", "MIN": "min", "NOP": "no",  "NYK": "ny",
+    "OKC": "okc", "ORL": "orl", "PHI": "phi", "PHX": "phx",
+    "POR": "por", "SAC": "sac", "SAS": "sa",  "TOR": "tor",
+    "UTA": "utah", "WAS": "wsh",
+}
 
-    Uses the ESPN scoreboard to discover game IDs, then the ESPN game
-    summary endpoint to pull starters (``boxscore.players``).  Starters
-    are only available once ESPN publishes them (typically after tip-off),
-    so pre-game responses will still list the matchups but with empty
-    starter arrays and ``lineup_status: "not_available"``.
+# Cache for team rosters to avoid repeated API calls within a short window
+_ROSTER_CACHE: dict[str, list[dict[str, Any]]] = {}
+_ROSTER_CACHE_AT: dict[str, datetime] = {}
+_ROSTER_CACHE_TTL = 3600  # 1 hour
+
+
+def _fetch_team_roster(team_abbreviation: str) -> list[dict[str, Any]]:
+    """
+    Fetch the full roster for an NBA team from the ESPN API.
+
+    Uses ``https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{slug}/roster``
+    and extracts each active player's name, position abbreviation, salary,
+    and player ID.
+
+    Results are cached for 1 hour per team to reduce API calls.
 
     Args:
-        game_date: Date string in ``YYYYMMDD`` format (e.g. ``"20260301"``).
+        team_abbreviation: Three-letter team abbreviation (e.g. ``"BOS"``).
 
     Returns:
-        A standardised dict::
+        List of player dicts with keys: ``name``, ``position``, ``salary``,
+        ``player_id``, ``jersey``.  Sorted by salary descending.
+    """
+    now = datetime.utcnow()
 
+    # Check cache
+    if team_abbreviation in _ROSTER_CACHE and team_abbreviation in _ROSTER_CACHE_AT:
+        age = (now - _ROSTER_CACHE_AT[team_abbreviation]).total_seconds()
+        if age < _ROSTER_CACHE_TTL:
+            return _ROSTER_CACHE[team_abbreviation]
+
+    slug = _ESPN_TEAM_SLUGS.get(team_abbreviation, team_abbreviation.lower())
+    url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{slug}/roster"
+
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        print(f"[_fetch_team_roster] Failed to fetch roster for {team_abbreviation}: {e}")
+        return _ROSTER_CACHE.get(team_abbreviation, [])
+
+    athletes = data.get("athletes", [])
+    roster: list[dict[str, Any]] = []
+
+    for athlete in athletes:
+        # Only include active players
+        status = athlete.get("status", {})
+        if status.get("type", "").lower() != "active":
+            continue
+
+        # Skip injured players (marked as "Out")
+        injuries = athlete.get("injuries", [])
+        is_out = any(
+            inj.get("status", "").lower() == "out"
+            for inj in injuries
+        )
+        if is_out:
+            continue
+
+        position = athlete.get("position", {})
+        contract = athlete.get("contract", {})
+        salary = contract.get("salary", 0) or 0
+
+        roster.append({
+            "name": athlete.get("displayName", "Unknown"),
+            "position": position.get("abbreviation", ""),
+            "salary": salary,
+            "player_id": str(athlete.get("id", "")),
+            "jersey": athlete.get("jersey", ""),
+        })
+
+    # Sort by salary descending
+    roster.sort(key=lambda p: p["salary"], reverse=True)
+
+    # Update cache
+    _ROSTER_CACHE[team_abbreviation] = roster
+    _ROSTER_CACHE_AT[team_abbreviation] = now
+
+    return roster
+
+
+def _pick_starters_by_salary(roster: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Select a starting five from a roster based on highest salary per position.
+
+    NBA standard starting lineup: 2 Guards (G), 2 Forwards (F), 1 Center (C).
+    For each position bucket, the highest-paid available (active, not injured)
+    players are selected.  If a position bucket can't be filled, the next
+    highest-paid remaining player is chosen regardless of position.
+
+    Args:
+        roster: List of player dicts (as returned by ``_fetch_team_roster``),
+                sorted by salary descending.
+
+    Returns:
+        List of up to 5 player dicts representing the projected starters,
+        each with keys: ``name``, ``position``, ``salary``, ``player_id``,
+        ``jersey``.
+    """
+    # Position buckets: how many starters we need per position group
+    needs = {"G": 2, "F": 2, "C": 1}
+    starters: list[dict[str, Any]] = []
+    used_ids: set[str] = set()
+
+    # First pass: fill each position bucket with highest-paid players
+    for pos, count in needs.items():
+        candidates = [
+            p for p in roster
+            if p["position"] == pos and p["player_id"] not in used_ids
+        ]
+        for player in candidates[:count]:
+            starters.append(player)
+            used_ids.add(player["player_id"])
+
+    # Second pass: if we have fewer than 5, fill with highest-paid remaining
+    if len(starters) < 5:
+        remaining = [p for p in roster if p["player_id"] not in used_ids]
+        for player in remaining:
+            if len(starters) >= 5:
+                break
+            starters.append(player)
+            used_ids.add(player["player_id"])
+
+    return starters
+
+
+def fetch_salary_based_lineups(game_date: str) -> dict[str, Any]:
+    """
+    Build projected starting lineups using the highest-paid players per position.
+
+    Instead of waiting for ESPN to publish actual starters (which happens
+    only around tip-off), this function uses each team's roster and current
+    contract salary data to project a starting five: the top-paid Guard (×2),
+    Forward (×2), and Center (×1) who are active and not listed as "Out".
+
+    Workflow:
+        1. Fetch the ESPN scoreboard for ``game_date`` to discover games.
+        2. For each team in those games, fetch the full roster (cached 1 hr).
+        3. Pick the top-paid player per position slot as the projected starter.
+
+    Args:
+        game_date: Date string in ``YYYYMMDD`` format (e.g. ``"20260307"``).
+
+    Returns:
             {
-                "date": "20260301",
-                "lineup_status": "confirmed" | "not_available",
-                "games": [ … ],
+                "date": "20260307",
+                "lineup_status": "projected",
+                "method": "salary_based",
+                "games": [
+                    {
+                        "game_id": "...",
+                        "home_team": {
+                            "team_name": "...",
+                            "team_abbreviation": "...",
+                            "starters": [ { "name", "position", "salary",
+                                            "player_id", "jersey" }, ... ]
+                        },
+                        "away_team": { ... }
+                    },
+                    ...
+                ],
                 "total_games": int,
             }
-
-        Each game entry contains ``game_id``, ``home_team``, and
-        ``away_team`` with ``team_name``, ``team_abbreviation``, and
-        ``starters`` (list of up to 5 players with ``name``, ``position``,
-        ``player_id``).
     """
     _ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-    _ESPN_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
     _TIMEOUT = 10
 
-    # ── 1. Discover games for the requested date ──────────────────────
-    resp = requests.get(_ESPN_SCOREBOARD_URL, params={"dates": game_date}, timeout=_TIMEOUT)
-    resp.raise_for_status()
-    events = resp.json().get("events", [])
+    # 1. Discover games for the requested date
+    try:
+        resp = requests.get(_ESPN_SCOREBOARD_URL, params={"dates": game_date}, timeout=_TIMEOUT)
+        resp.raise_for_status()
+        events = resp.json().get("events", [])
+    except Exception as e:
+        print(f"[fetch_salary_based_lineups] scoreboard fetch failed: {e}")
+        return {
+            "date": game_date,
+            "lineup_status": "error",
+            "method": "salary_based",
+            "message": f"Failed to fetch scoreboard: {e}",
+            "games": [],
+            "total_games": 0,
+        }
 
     if not events:
         return {
             "date": game_date,
             "lineup_status": "not_available",
+            "method": "salary_based",
             "message": "No games found for this date.",
             "games": [],
             "total_games": 0,
         }
 
-    # ── 2. For each game, fetch the summary and extract starters ──────
+    # 2. For each game, fetch rosters and build projected lineups
     games: list[dict[str, Any]] = []
-    any_starters_found = False
 
     for event in events:
         game_id = event.get("id", "")
         competition = (event.get("competitions") or [{}])[0]
 
-        # Build team shells from the scoreboard (always available)
-        team_map: dict[str, dict[str, Any]] = {}  # homeAway -> team info
+        game_entry: dict[str, Any] = {"game_id": game_id}
+
         for competitor in competition.get("competitors", []):
-            side = competitor.get("homeAway", "")
+            side = competitor.get("homeAway", "")  # "home" or "away"
             team = competitor.get("team", {})
-            team_map[side] = {
-                "team_name": team.get("displayName", ""),
-                "team_abbreviation": team.get("abbreviation", ""),
-                "starters": [],
+            team_name = team.get("displayName", "")
+            team_abbrev = team.get("abbreviation", "")
+
+            # Fetch roster and pick starters
+            roster = _fetch_team_roster(team_abbrev)
+            starters = _pick_starters_by_salary(roster)
+
+            # Format starters for output (drop salary from public response, keep for transparency)
+            formatted_starters = [
+                {
+                    "name": p["name"],
+                    "position": p["position"],
+                    "salary": p["salary"],
+                    "player_id": p["player_id"],
+                    "jersey": p["jersey"],
+                }
+                for p in starters
+            ]
+
+            side_key = "home_team" if side == "home" else "away_team"
+            game_entry[side_key] = {
+                "team_name": team_name,
+                "team_abbreviation": team_abbrev,
+                "starters": formatted_starters,
             }
 
-        # Fetch the game summary for starter data
-        try:
-            summary_resp = requests.get(
-                _ESPN_SUMMARY_URL,
-                params={"event": game_id},
-                timeout=_TIMEOUT,
-            )
-            summary_resp.raise_for_status()
-            summary = summary_resp.json()
-
-            boxscore_players = summary.get("boxscore", {}).get("players", [])
-            for player_group in boxscore_players:
-                group_team = player_group.get("team", {})
-                abbrev = group_team.get("abbreviation", "")
-
-                # Match this player group to home or away
-                side = None
-                for s, info in team_map.items():
-                    if info["team_abbreviation"] == abbrev:
-                        side = s
-                        break
-                if side is None:
-                    continue
-
-                statistics = player_group.get("statistics", [])
-                if not statistics:
-                    continue
-
-                athletes = statistics[0].get("athletes", [])
-                starters = [a for a in athletes if a.get("starter")]
-                for starter in starters[:5]:
-                    athlete = starter.get("athlete", {})
-                    position = athlete.get("position", {})
-                    team_map[side]["starters"].append({
-                        "name": athlete.get("displayName", "Unknown"),
-                        "position": position.get("abbreviation", ""),
-                        "player_id": str(athlete.get("id", "")),
-                    })
-                if starters:
-                    any_starters_found = True
-
-        except Exception as e:
-            print(f"[fetch_espn_lineups] summary fetch failed for game {game_id}: {e}")
-
-        games.append({
-            "game_id": game_id,
-            "home_team": team_map.get("home"),
-            "away_team": team_map.get("away"),
-        })
+        games.append(game_entry)
 
     return {
         "date": game_date,
-        "lineup_status": "confirmed" if any_starters_found else "not_available",
+        "lineup_status": "projected",
+        "method": "salary_based",
+        "message": "Lineups are projected based on highest-paid active players per position (2G, 2F, 1C).",
         "games": games,
         "total_games": len(games),
-        **(
-            {"message": "Starting lineups not yet available. Lineups are typically posted around tip-off."}
-            if not any_starters_found
-            else {}
-        ),
     }
-
-
-# Keep old name as a thin alias so nothing else breaks.
-def parse_lineup_data(raw_data: dict, game_date: str) -> dict:  # noqa: ARG001
-    """Deprecated — prefer ``fetch_espn_lineups(game_date)`` instead."""
-    return fetch_espn_lineups(game_date)
 
 # deque to keep track of timestamps of the last 10 requests
 _SPORTSGAMEODDS_REQUEST_TIMES: deque[float] = deque(maxlen=10)
@@ -788,7 +912,7 @@ def _l10_by_abbrev_from_espn_standings() -> dict[str, tuple[int, int]]:
     return abbrev_to_l10
 
 
-def fetch_games_from_nba() -> list[dict[str, Any]]:
+def fetch_full_game_stats() -> list[dict[str, Any]]:
     """
     Fetch full game data from ESPN API with all stats.
     Used by /api/games/stats endpoint for detailed statistics.
@@ -813,15 +937,13 @@ def fetch_games_from_nba() -> list[dict[str, Any]]:
     return result
 
 
-def fetch_dashboard_games(date : str = None) -> list[dict[str, Any]]:
+def fetch_dashboard_games() -> list[dict[str, Any]]:
     """
     Fetch lightweight game data from ESPN API for dashboard display.
     Returns only: game_id, status, team names/abbr, records, scores.
     Used by /api/games endpoint.
     """
     url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-    if date:
-        url += f"?dates={date}"
     resp = requests.get(url, timeout=10)
     resp.raise_for_status()
     raw = resp.json()
