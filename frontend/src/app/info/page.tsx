@@ -5,28 +5,42 @@ export default function InfoPage() {
         <header className="space-y-2">
           <h1 className="text-3xl font-bold">How to Use This App</h1>
           <p className="text-zinc-600 dark:text-zinc-300">
-            This page explains what each page shows, where the numbers come
-            from, and practical ways to use the tool.
+            This guide explains what you can do on each page and how the
+            numbers can help you make better decisions.
           </p>
         </header>
+
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6">
+          <h2 className="text-2xl font-semibold">Ways to Use the Tool</h2>
+          <ul className="mt-3 list-disc pl-5 space-y-2 text-zinc-700 dark:text-zinc-300">
+            <li>
+              Start on Games to find matchups that look interesting.
+            </li>
+            <li>
+              Open one game for deeper context before making decisions.
+            </li>
+            <li>
+              Use Props to compare player projections and shortlist targets.
+            </li>
+            <li>
+              Treat this app as decision support, not guaranteed advice.
+            </li>
+          </ul>
+        </section>
 
         <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6">
           <h2 className="text-2xl font-semibold">Games Page</h2>
           <ul className="mt-3 list-disc pl-5 space-y-2 text-zinc-700 dark:text-zinc-300">
             <li>
-              Shows active/scheduled NBA games, records, scores, status, and win
-              probability for each matchup.
+              See today&apos;s matchups at a glance, including score, game status,
+              team records, and each team&apos;s chance to win.
             </li>
             <li>
-              Main data source: <code>GET /api/games</code> plus live updates
-              from WebSocket topic <code>games</code>.
+              Each game card is clickable. Click any card to open that game&apos;s
+              full details page.
             </li>
             <li>
-              If backend data is unavailable, the UI falls back to local mock
-              data so the page still renders.
-            </li>
-            <li>
-              Standings panel is loaded from <code>GET /api/standings</code>.
+              You can also pin games you care about so they stay easy to find.
             </li>
           </ul>
         </section>
@@ -35,20 +49,19 @@ export default function InfoPage() {
           <h2 className="text-2xl font-semibold">Individual Game Page</h2>
           <ul className="mt-3 list-disc pl-5 space-y-2 text-zinc-700 dark:text-zinc-300">
             <li>
-              Shows team info, score by quarter, game leaders, team stats, and a
-              win probability chart for one game.
+              Get a deeper look at one matchup with quarter-by-quarter scoring,
+              team stats, game leaders, and a live win-probability view.
             </li>
             <li>
-              Data source: <code>GET /api/games/stats/{"{"}game_id{"}"}</code> and
-              WebSocket topic <code>game:{"{"}game_id{"}"}</code>.
+              Use this page when you want context, not just the final score.
             </li>
             <li>
-              Win probability values come from backend probabilities when
-              available.
+              It helps answer questions like: Which team is controlling the
+              game? Who is producing the most? Is the game trending one way?
             </li>
             <li>
-              If quarter-level data is missing, the chart marks the line as
-              sample data.
+              If some stats are missing during a game, values may update as new
+              information comes in.
             </li>
           </ul>
         </section>
@@ -57,38 +70,55 @@ export default function InfoPage() {
           <h2 className="text-2xl font-semibold">Props Page</h2>
           <ul className="mt-3 list-disc pl-5 space-y-2 text-zinc-700 dark:text-zinc-300">
             <li>
-              Shows player projections for PTS, REB, and AST with search/filter
-              tools.
+              Browse player stat projections for points, rebounds, and assists.
             </li>
-            <li>Current source in frontend is local mock projections.</li>
             <li>
-              Projection cards also show game context and on-floor indicator to
-              help compare players quickly.
+              Use search and filters to narrow down to specific teams, players,
+              or stat categories.
             </li>
-            <li>These values are projections, not sportsbook lines.</li>
+            <li>
+              Player cards include game context so you can compare options more
+              quickly.
+            </li>
+            <li>
+              These values are projections, so they are best used as a guide
+              alongside your own judgment.
+            </li>
           </ul>
         </section>
 
-        <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6">
-          <h2 className="text-2xl font-semibold">Ways to Use the Tool</h2>
-          <ul className="mt-3 list-disc pl-5 space-y-2 text-zinc-700 dark:text-zinc-300">
-            <li>
-              Start on Games to identify close games, momentum changes, or large
-              win probability swings.
-            </li>
-            <li>
-              Open an individual game to inspect leaders and team stats before
-              evaluating prop angles.
-            </li>
-            <li>
-              Use Props filters to find players, then compare projected
-              PTS/REB/AST against your preferred sportsbook lines.
-            </li>
-            <li>
-              Use this tool as informational support only, not guaranteed betting
-              advice.
-            </li>
-          </ul>
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 text-sm leading-7 text-zinc-600 dark:text-zinc-300 text-center">
+          <p>
+            This app is for informational and educational purposes only. Stats,
+            win probabilities, and player projections are estimates and may be
+            delayed, incomplete, or inaccurate. Nothing shown in this app is
+            financial, betting, or legal advice, and no outcome is guaranteed.
+          </p>
+          <p className="mt-4">
+            Users are responsible for verifying all information with official
+            sources and for following the laws and age requirements in their
+            location. This project is not a sportsbook and does not accept
+            wagers.
+          </p>
+          <p className="mt-4">
+            If gambling is causing harm, help is available 24/7 in the U.S. at{" "}
+            <a
+              href="tel:18004262537"
+              className="font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+            >
+              1-800-GAMBLER (1-800-426-2537)
+            </a>{" "}
+            or by visiting{" "}
+            <a
+              href="https://www.1800gambler.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+            >
+              1800gambler.net
+            </a>
+            .
+          </p>
         </section>
       </article>
     </main>
