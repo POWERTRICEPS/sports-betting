@@ -5,8 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ConnectionStatus, PropsSnapshotResponse } from "@/app/types";
 import PlayerPropCard from "./PropCard";
 
-// const BACKEND_URL = "pj09-sports-betting.onrender.com";
-const BACKEND_URL = "localhost:8000";
+const BACKEND_URL = "pj09-sports-betting.onrender.com";
+// const BACKEND_URL = "localhost:8000";
 const isLocal =
   BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
 const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
