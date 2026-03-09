@@ -320,18 +320,18 @@ def _parse_date_param(value: str) -> date_type | None:
 async def games_by_date(date: str):
     """
     Returns games on date {date} with dashboard-viewable data only.
-    - If date is today: fetches from ESPN (live/upcoming).
-    - If date is not today: fetches from database (completed games only).
+    - If date is today or in the future: fetches from ESPN for that date.
+    - If date is in the past: fetches from database (completed games only).
     """
     try:
         parsed = _parse_date_param(date)
         if parsed is None:
             return []
-        is_today = parsed == date_type.today()
         date_yyyy_mm_dd = parsed.isoformat()
+        use_espn = parsed >= date_type.today()
 
-        if is_today:
-            g = fetch_dashboard_games()
+        if use_espn:
+            g = fetch_dashboard_games(game_date=date_yyyy_mm_dd)
             p = compute_win_probabilities(g)
             return merge_gp(g, p)
         else:
