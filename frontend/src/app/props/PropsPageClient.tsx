@@ -311,6 +311,7 @@ export default function PropsPageClient() {
           </p>
           {error && <p className="mt-1 text-red-500">{error}</p>}
         </div>
+
       </div>
     </main>
   );
