@@ -21,6 +21,8 @@ interface DataPoint {
     home: number;
     away: number;
     clock: string;
+    homeScore: number;
+    awayScore: number;
 }
 
 /**
@@ -59,7 +61,16 @@ function buildData(game: Game): DataPoint[] {
         const home = game.home_win_prob;
         const away = game.away_win_prob;
         if (home != null && away != null) {
-            return [{ index: 0, home, away, clock: game.status }];
+            return [
+                {
+                    index: 0,
+                    home,
+                    away,
+                    clock: game.status,
+                    homeScore: game.home_score ?? 0,
+                    awayScore: game.away_score ?? 0,
+                },
+            ];
         }
         return [];
     }
@@ -69,6 +80,8 @@ function buildData(game: Game): DataPoint[] {
         home: snap.home_win_prob,
         away: snap.away_win_prob,
         clock: snap.clock,
+        homeScore: snap.home_score ?? 0,
+        awayScore: snap.away_score ?? 0,
     }));
 }
 
@@ -115,45 +128,128 @@ function computeTicks(data: DataPoint[]): {
     return { positions, labels };
 }
 
+/** Format the raw ESPN clock string into a human-readable time remaining. */
+function formatTimeRemaining(clock: string): string {
+    if (!clock) return '';
+    if (/halftime/i.test(clock)) return 'Halftime';
+    if (/final/i.test(clock)) return 'Final';
+    if (/pregame|scheduled/i.test(clock)) return 'Pregame';
+    if (/\d{1,2}:\d{2}\s*(AM|PM)\s*(E[SD]?T|ET)/i.test(clock)) return 'Pregame';
+
+    const endMatch = clock.match(/end of (\d)(?:st|nd|rd|th)/i);
+    if (endMatch) return `End of Q${endMatch[1]}`;
+
+    // "7:07 - 3rd" → "7:07 remaining in Q3"
+    const match = clock.match(/^(.+?)\s*-\s*(\d)(?:st|nd|rd|th)$/i);
+    if (match) return `${match[1].trim()} remaining in Q${match[2]}`;
+
+    // OT variants: "2:30 - OT" or "1:15 - 2OT"
+    const otMatch = clock.match(/^(.+?)\s*-\s*(\d*OT)$/i);
+    if (otMatch)
+        return `${otMatch[1].trim()} remaining in ${otMatch[2].toUpperCase()}`;
+    if (/overtime|ot/i.test(clock)) return 'Overtime';
+
+    return clock;
+}
+
+/** Format a probability delta with arrow and sign, e.g. "▲ +2.3%" */
+function formatShift(delta: number): {
+    text: string;
+    className: string;
+} {
+    if (delta === 0) return { text: '—', className: 'text-gray-400 dark:text-zinc-500' };
+    const arrow = delta > 0 ? '▲' : '▼';
+    const sign = delta > 0 ? '+' : '';
+    const cls =
+        delta > 0
+            ? 'text-green-600 dark:text-emerald-400'
+            : 'text-red-500 dark:text-red-400';
+    return { text: `${arrow} ${sign}${delta.toFixed(1)}%`, className: cls };
+}
+
 /* Custom tooltip for the chart */
-function ProbTooltip({ active, payload }: any) {
+function ProbTooltip({
+    active,
+    payload,
+    game,
+    data,
+}: any & { game: Game; data: DataPoint[] }) {
     if (!active || !payload?.length) return null;
-    const home = payload.find((p: any) => p.dataKey === 'home');
-    const away = payload.find((p: any) => p.dataKey === 'away');
-    const clock: string = payload[0]?.payload?.clock || '';
+
+    const point: DataPoint = payload[0]?.payload;
+    if (!point) return null;
+
+    const homeVal: number = point.home;
+    const awayVal: number = point.away;
+    const idx: number = point.index;
+
+    // Probability shift compared to the previous snapshot
+    const prev: DataPoint | undefined = data[idx - 1];
+    const homeShift = prev != null ? homeVal - prev.home : 0;
+    const awayShift = prev != null ? awayVal - prev.away : 0;
+    const hs = formatShift(homeShift);
+    const as = formatShift(awayShift);
+
+    // Score differential
+    const diff = point.homeScore - point.awayScore;
+    const diffLabel =
+        diff === 0
+            ? 'Tied'
+            : diff > 0
+              ? `${game.home_team} +${diff}`
+              : `${game.away_team} +${Math.abs(diff)}`;
+
     return (
-        <div className="rounded-lg border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 shadow-md text-xs">
-            <div className="font-semibold text-gray-700 dark:text-zinc-200 mb-1">
-                {clock}
+        <div className="rounded-lg border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3.5 py-2.5 shadow-md text-xs min-w-[180px]">
+            {/* Time remaining */}
+            <div className="font-semibold text-gray-700 dark:text-zinc-200 mb-1.5">
+                {formatTimeRemaining(point.clock)}
             </div>
-            {home && (
+
+            {/* Score + differential */}
+            <div className="flex items-center justify-between gap-3 mb-2 pb-2 border-b border-gray-100 dark:border-zinc-700">
+                <span className="text-gray-700 dark:text-zinc-300 font-medium">
+                    {game.away_abbreviation} {point.awayScore} –{' '}
+                    {game.home_abbreviation} {point.homeScore}
+                </span>
+                <span className="text-gray-500 dark:text-zinc-400 font-medium">
+                    {diffLabel}
+                </span>
+            </div>
+
+            {/* Home team probability + shift */}
+            <div className="flex items-center justify-between gap-3 mb-1">
                 <div className="flex items-center gap-1.5">
                     <span
                         className="inline-block h-2 w-2 rounded-full"
                         style={{ background: '#16a34a' }}
                     />
                     <span className="text-gray-600 dark:text-zinc-400">
-                        Home:
+                        {game.home_team}:
                     </span>
                     <span className="font-bold text-gray-900 dark:text-zinc-100">
-                        {home.value.toFixed(1)}%
+                        {homeVal.toFixed(1)}%
                     </span>
                 </div>
-            )}
-            {away && (
+                <span className={`font-medium ${hs.className}`}>{hs.text}</span>
+            </div>
+
+            {/* Away team probability + shift */}
+            <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-1.5">
                     <span
                         className="inline-block h-2 w-2 rounded-full"
                         style={{ background: '#ef4444' }}
                     />
                     <span className="text-gray-600 dark:text-zinc-400">
-                        Away:
+                        {game.away_team}:
                     </span>
                     <span className="font-bold text-gray-900 dark:text-zinc-100">
-                        {away.value.toFixed(1)}%
+                        {awayVal.toFixed(1)}%
                     </span>
                 </div>
-            )}
+                <span className={`font-medium ${as.className}`}>{as.text}</span>
+            </div>
         </div>
     );
 }
@@ -274,7 +370,11 @@ export default function WinProbabilityGraph({
                             strokeWidth={1}
                         />
 
-                        <Tooltip content={<ProbTooltip />} />
+                        <Tooltip
+                            content={
+                                <ProbTooltip game={game} data={data} />
+                            }
+                        />
 
                         <Area
                             type="monotone"

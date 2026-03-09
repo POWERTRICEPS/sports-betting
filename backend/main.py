@@ -51,6 +51,8 @@ async def update_games_and_probabilities():
         probs = probabilities[game_id]
         snapshot = {
             "clock": game.get("status", ""),
+            "home_score": int(game.get("home_score", 0) or 0),
+            "away_score": int(game.get("away_score", 0) or 0),
             "home_win_prob": probs["home_win_prob"],
             "away_win_prob": probs["away_win_prob"],
         }

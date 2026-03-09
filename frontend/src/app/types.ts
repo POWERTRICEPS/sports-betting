@@ -1,5 +1,7 @@
 export interface ProbabilitySnapshot {
   clock: string;
+  home_score: number;
+  away_score: number;
   home_win_prob: number;
   away_win_prob: number;
 }
