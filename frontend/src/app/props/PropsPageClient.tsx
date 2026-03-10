@@ -4,15 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ConnectionStatus, PropsSnapshotResponse } from "@/app/types";
 import PlayerPropCard from "./PropCard";
+import { BACKEND_WS_URL, backendApiUrl } from "@/app/backend";
 
-const BACKEND_URL = "pj09-sports-betting.onrender.com";
-// const BACKEND_URL = "localhost:8000";
-const isLocal =
-  BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
-const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
-const PROPS_API_URL = isLocal
-  ? `http://${BACKEND_URL}/api/props`
-  : `https://${BACKEND_URL}/api/props`;
+const PROPS_API_URL = backendApiUrl("/api/props");
 const PROPS_TOPIC = "props";
 
 function isPropsSnapshotResponse(
@@ -128,7 +122,7 @@ export default function PropsPageClient() {
   }, []);
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(BACKEND_WS_URL);
     wsRef.current = ws;
     setConnectionStatus("connecting");
 

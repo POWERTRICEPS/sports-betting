@@ -105,11 +105,19 @@ cd pj09-sports-betting
 
 ### 2. Switch to local backend
 
-By default, the frontend (even when running locally) talks to the deployed version of the backend. To run on the local backend you will have to switch the following URLs.
+By default, the frontend talks to the deployed backend.
+To use local backend instead, set this env var before running frontend:
 
-- In **frontend/src/app/games/[id]/GameClient.tsx**, comment out line 10 and uncomment line 11
-- In **frontend/src/app/GameDataProvider.tsx**, comment out line 17 and uncomment line 18
-- In **frontend/src/app/on/[id]/gamesByDate.tsx**, change line 11 and uncomment line 12
+```bash
+cd frontend
+echo "NEXT_PUBLIC_BACKEND_URL=http://localhost:8000" > .env.local
+```
+
+You can switch back to production by removing the file or setting:
+
+```bash
+NEXT_PUBLIC_BACKEND_URL=https://pj09-sports-betting.onrender.com
+```
 
 ### 3. Backend setup
 

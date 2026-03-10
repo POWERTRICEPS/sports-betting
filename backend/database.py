@@ -501,6 +501,98 @@ async def save_probability_history(game_id: str, history: list[dict]) -> int:
         return 0
 
 
+def _snapshot_signature(snap: dict) -> tuple[str, int, int, float, float]:
+    return (
+        str(snap.get("clock", "")),
+        int(snap.get("home_score", 0) or 0),
+        int(snap.get("away_score", 0) or 0),
+        float(snap.get("home_win_prob", 0)),
+        float(snap.get("away_win_prob", 0)),
+    )
+
+
+def _append_probability_history_sync(game_id: str, snapshots: list[dict]) -> int:
+    """
+    Append new probability snapshots for a game without deleting existing rows.
+    Uses latest-row signature matching for duplicate-tail protection.
+    """
+    if not snapshots:
+        return 0
+
+    try:
+        gid = int(game_id)
+    except (TypeError, ValueError):
+        return 0
+
+    inserted = 0
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT clock_display, home_team_score, away_team_score,
+                       home_win_probability, away_win_probability
+                FROM game_probability_history
+                WHERE game_id = %s
+                ORDER BY probability_id DESC
+                LIMIT 1
+                """,
+                (gid,),
+            )
+            last_row = cur.fetchone()
+            last_sig = None
+            if last_row:
+                last_sig = (
+                    str(last_row["clock_display"]),
+                    int(last_row["home_team_score"]),
+                    int(last_row["away_team_score"]),
+                    float(last_row["home_win_probability"]),
+                    float(last_row["away_win_probability"]),
+                )
+
+            for snap in snapshots:
+                sig = _snapshot_signature(snap)
+                if last_sig is not None and sig == last_sig:
+                    continue
+
+                cur.execute(
+                    """
+                    INSERT INTO game_probability_history
+                        (game_id, clock_display, home_team_score, away_team_score,
+                         home_win_probability, away_win_probability)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        gid,
+                        sig[0],
+                        sig[1],
+                        sig[2],
+                        sig[3],
+                        sig[4],
+                    ),
+                )
+                inserted += 1
+                last_sig = sig
+    return inserted
+
+
+async def append_probability_history(game_id: str, snapshots: list[dict]) -> int:
+    """Async wrapper: append new probability snapshots for a game."""
+    import asyncio
+
+    try:
+        count = await asyncio.to_thread(
+            _append_probability_history_sync,
+            game_id,
+            snapshots,
+        )
+        if count:
+            print(f"[db] appended {count} probability snapshots for game {game_id}")
+        return count
+    except Exception as e:
+        print(f"[db] failed to append probability history for game {game_id}: {e}")
+        return 0
+
+
 def get_probability_history(game_id: str) -> list[dict]:
     """
     Fetch stored probability history for a past game from the database.

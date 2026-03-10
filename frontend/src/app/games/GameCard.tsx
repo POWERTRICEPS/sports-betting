@@ -17,10 +17,19 @@ type GameCardProps = {
   data: Game;
   isPinned: boolean;
   onTogglePin: (gameId: string) => void;
+  disableNavigation?: boolean;
+  disabledReason?: string;
 };
 
-export default function GameCard({ data, isPinned, onTogglePin }: GameCardProps) {
+export default function GameCard({
+  data,
+  isPinned,
+  onTogglePin,
+  disableNavigation = false,
+  disabledReason,
+}: GameCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [showDisabledModal, setShowDisabledModal] = useState(false);
 
   const homePrimary =
     teamPrimaryColors[data.home_abbreviation] ?? "#1F2937";
@@ -28,15 +37,27 @@ export default function GameCard({ data, isPinned, onTogglePin }: GameCardProps)
     teamPrimaryColors[data.away_abbreviation] ?? "#1F2937";
 
   return (
+    <>
     <Link
-      href={`/games/${data.game_id}`}
-      className="relative block border border-gray-300 dark:border-zinc-700 rounded-lg p-6 shadow-md hover:shadow-lg transform transition-all duration-200 hover:scale-105 cursor-pointer"
+      href={disableNavigation ? "#" : `/games/${data.game_id}`}
+      aria-disabled={disableNavigation}
+      onClick={(e) => {
+        if (disableNavigation) {
+          e.preventDefault();
+          setShowDisabledModal(true);
+        }
+      }}
+      className={`relative block border border-gray-300 dark:border-zinc-700 rounded-lg p-6 shadow-md transform transition-all duration-200 ${
+        disableNavigation
+          ? "cursor-pointer opacity-90"
+          : "hover:shadow-lg hover:scale-105 cursor-pointer"
+      }`}
       style={{
         background: `
           radial-gradient(ellipse 120% 100% at 0% 0%, ${awayPrimary}65, transparent 65%),
           radial-gradient(ellipse 120% 100% at 100% 0%, ${homePrimary}65, transparent 65%)
         `,
-        ...(isHovered && {
+        ...(!disableNavigation && isHovered && {
           boxShadow:
             "0 0 30px rgba(100, 220, 255, 0.9), inset 0 0 1px rgba(100, 220, 255, 0.3)",
         }),
@@ -125,5 +146,35 @@ export default function GameCard({ data, isPinned, onTogglePin }: GameCardProps)
         </div>
       </div>
     </Link>
+    {showDisabledModal ? (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        onClick={() => setShowDisabledModal(false)}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="w-full max-w-md rounded-xl border border-zinc-300 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Game Details Unavailable
+          </h3>
+          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">
+            {disabledReason ?? "Details available on game day."}
+          </p>
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowDisabledModal(false)}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }

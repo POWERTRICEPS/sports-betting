@@ -9,13 +9,7 @@ import {
   GameDetailErrorState,
   GameDetailLoadingState,
 } from "../GameStates";
-
-const BACKEND_URL = "pj09-sports-betting.onrender.com";
-// const BACKEND_URL = "localhost:8000";
-const isLocal =
-  BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
-const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
-const API_URL = isLocal ? `http://${BACKEND_URL}` : `https://${BACKEND_URL}`;
+import { BACKEND_WS_URL, backendApiUrl } from "@/app/backend";
 
 export default function GameClient({ id }: { id: string }) {
   const imgSize = 150;
@@ -29,7 +23,7 @@ export default function GameClient({ id }: { id: string }) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/games/stats/${id}`);
+      const res = await fetch(backendApiUrl(`/api/games/stats/${id}`));
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setGame(data);
@@ -55,7 +49,7 @@ export default function GameClient({ id }: { id: string }) {
     const topic = `game:${id}`;
 
     function connect() {
-      const ws = new WebSocket(WS_URL);
+      const ws = new WebSocket(BACKEND_WS_URL);
       wsRef.current = ws;
 
       ws.onopen = () => {

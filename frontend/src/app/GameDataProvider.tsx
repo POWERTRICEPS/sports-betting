@@ -13,17 +13,10 @@ import type {
   ConnectionStatus,
   StandingsResponse,
 } from "./types";
+import { BACKEND_WS_URL, backendApiUrl } from "./backend";
 
-const BACKEND_URL = "pj09-sports-betting.onrender.com";
-// const BACKEND_URL = "localhost:8000";
-const isLocal = BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
-const WS_URL = isLocal ? `ws://${BACKEND_URL}/ws` : `wss://${BACKEND_URL}/ws`;
-const API_URL = isLocal
-  ? `http://${BACKEND_URL}/api/games`
-  : `https://${BACKEND_URL}/api/games`;
-const STANDINGS_API_URL = isLocal
-  ? `http://${BACKEND_URL}/api/standings`
-  : `https://${BACKEND_URL}/api/standings`;
+const API_URL = backendApiUrl("/api/games");
+const STANDINGS_API_URL = backendApiUrl("/api/standings");
 const RECONNECT_INTERVAL = 5000; // 5 second interval
 const MAX_RECONNECT_ATTEMPTS = 10;
 
@@ -94,7 +87,7 @@ export function GameDataProvider({ children }: { children: React.ReactNode }) {
       setStatus("connecting");
       setError(null);
 
-      const ws = new WebSocket(WS_URL);
+      const ws = new WebSocket(BACKEND_WS_URL);
       wsRef.current = ws;
 
       ws.onopen = () => {
