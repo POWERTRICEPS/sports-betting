@@ -15,7 +15,9 @@ const PROPS_API_URL = isLocal
   : `https://${BACKEND_URL}/api/props`;
 const PROPS_TOPIC = "props";
 
-function isPropsSnapshotResponse(payload: unknown): payload is PropsSnapshotResponse {
+function isPropsSnapshotResponse(
+  payload: unknown,
+): payload is PropsSnapshotResponse {
   if (!payload || typeof payload !== "object") return false;
   const obj = payload as Record<string, unknown>;
   if (!Array.isArray(obj.projections)) return false;
@@ -32,7 +34,8 @@ export default function PropsPageClient() {
     updated_at: null,
     projections: [],
   });
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -45,8 +48,8 @@ export default function PropsPageClient() {
   const sortParam = searchParams.get("sort");
   const queryParam = searchParams.get("q") ?? "";
 
-  const [selectedTeam, setSelectedTeam] = useState<string>(
-    () => (teamParam ? teamParam : "All"),
+  const [selectedTeam, setSelectedTeam] = useState<string>(() =>
+    teamParam ? teamParam : "All",
   );
   const [selectedCategory, setSelectedCategory] = useState<string>(() =>
     sortParam && ["All", "PTS", "REB", "AST"].includes(sortParam)
@@ -85,7 +88,14 @@ export default function PropsPageClient() {
         scroll: false,
       });
     }
-  }, [debouncedQuery, pathname, router, searchParams, selectedCategory, selectedTeam]);
+  }, [
+    debouncedQuery,
+    pathname,
+    router,
+    searchParams,
+    selectedCategory,
+    selectedTeam,
+  ]);
 
   useEffect(() => {
     let mounted = true;
@@ -177,8 +187,10 @@ export default function PropsPageClient() {
 
     if (selectedCategory !== "All") {
       result.sort((a, b) => {
-        if (selectedCategory === "PTS") return b.projected_pts - a.projected_pts;
-        if (selectedCategory === "REB") return b.projected_reb - a.projected_reb;
+        if (selectedCategory === "PTS")
+          return b.projected_pts - a.projected_pts;
+        if (selectedCategory === "REB")
+          return b.projected_reb - a.projected_reb;
         return b.projected_ast - a.projected_ast;
       });
     }
@@ -193,7 +205,9 @@ export default function PropsPageClient() {
   };
 
   const hasActiveFilters =
-    selectedTeam !== "All" || selectedCategory !== "All" || searchQuery.trim() !== "";
+    selectedTeam !== "All" ||
+    selectedCategory !== "All" ||
+    searchQuery.trim() !== "";
   const totalProps = snapshot.projections.length;
   const visibleProps = filteredProps.length;
   const trimmedSearchQuery = searchQuery.trim();

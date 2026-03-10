@@ -1,7 +1,10 @@
 """
-Scrape play-by-play for ~top 5 players per team (up to 150 players) over the last 3 seasons.
+Scrape play-by-play for top + bottom scorers per team over the last 3 seasons.
 Build a dataset with the listed features to train a model that predicts a player's
 total points at the end of the game from in-game state.
+
+Includes both high and low scorers to avoid bias toward overpredicting points
+for role players (e.g. Jeremy Sochan at 4 ppg predicted as 19).
 
 Features:
   seconds_remaining, current_points, current_minutes, season_ppg, season_fga, season_mpg,
@@ -24,8 +27,12 @@ from nba_api.stats.endpoints import leaguegamefinder, leaguedashplayerstats
 SEC_PER_QUARTER = 720
 OT_PERIOD_SEC = 300
 REGULATION_SEC = 4 * SEC_PER_QUARTER
-TOP_N_PER_TEAM = 1
-SEASONS = ["2022-23", "2023-24", "2024-25"]
+TOP_N_HIGH = 5   # top scorers per team (high ppg)
+TOP_N_LOW = 5    # lowest scorers per team among rotation players (low ppg)
+TOP_N_END_OF_BENCH = 3  # extra: very low mpg/ppg (true end-of-bench)
+MIN_GP_FOR_LOW = 20     # min games for "low scorer" pool
+MIN_GP_END_OF_BENCH = 10  # min games for end-of-bench (fewer = more noise risk)
+SEASONS = ["2021-22", "2022-23", "2023-24", "2024-25"]  # +1 season for more low-scorer examples
 API_DELAY = 0.600
 
 
@@ -84,7 +91,9 @@ def substitution_type(action: dict) -> str | None:
 
 
 def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFrame]:
-    """Return (set of player IDs to track, DataFrame of season stats: PLAYER_ID, SEASON_PPG, SEASON_FGA, SEASON_3PA, SEASON_MPG)."""
+    """Return (set of player IDs to track, DataFrame of season stats).
+    Tracks top N high scorers + top N low scorers per team to balance training data
+    and avoid overpredicting points for role players."""
     for attempt in range(1, 4):
         try:
             ld = leaguedashplayerstats.LeagueDashPlayerStats(season=season)
@@ -132,8 +141,15 @@ def get_top_players_and_season_stats(season: str) -> tuple[set[int], pd.DataFram
     top_players = set()
     season_stats = []
     for _, group in df.groupby(team_col):
-        top = group.nlargest(TOP_N_PER_TEAM, "PTS")
-        for _, row in top.iterrows():
+        # Top scorers by PPG (high-usage players)
+        high = group.nlargest(TOP_N_HIGH, "SEASON_PPG")
+        # Bottom scorers by PPG among rotation players (role players, low-usage)
+        rotation = group[group["GP"] >= MIN_GP_FOR_LOW]
+        low = rotation.nsmallest(TOP_N_LOW, "SEASON_PPG") if len(rotation) >= TOP_N_LOW else rotation
+        # End-of-bench: very low PPG, 10+ GP (catches deep bench who play sparingly)
+        eob = group[group["GP"] >= MIN_GP_END_OF_BENCH].nsmallest(TOP_N_END_OF_BENCH, "SEASON_PPG")
+        combined = pd.concat([high, low, eob]).drop_duplicates(subset=["PLAYER_ID"])
+        for _, row in combined.iterrows():
             pid = int(row["PLAYER_ID"])
             top_players.add(pid)
             season_stats.append({
@@ -403,7 +419,7 @@ def scrape_season(season: str):
     print("Fetching season stats for", season)
     try:
         tracked, season_stats_df = get_top_players_and_season_stats(season)
-        print(f"Tracking {len(tracked)} players (top {TOP_N_PER_TEAM} per team).")
+        print(f"Tracking {len(tracked)} players (top {TOP_N_HIGH} + bottom {TOP_N_LOW} + end-of-bench {TOP_N_END_OF_BENCH} per team).")
     except Exception as e:
         print(f"Skipping season {season}: {e}")
         return
