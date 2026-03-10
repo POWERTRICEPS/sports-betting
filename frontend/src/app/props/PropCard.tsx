@@ -9,6 +9,15 @@ function getHeadshotUrl(espnPlayerId: string): string {
   return `https://a.espncdn.com/i/headshots/nba/players/full/${espnPlayerId}.png`;
 }
 
+function isGameLive(status: string | undefined): boolean {
+  const s = (status ?? "").trim().toLowerCase();
+  if (!s) return false;
+  if (s.includes("final") || s.includes("game over") || s.includes("f/ot")) return false;
+  if (s.includes("pregame") || s.includes("scheduled")) return false;
+  if (/\b(am|pm)\b/.test(s) && (s.includes("et") || s.includes("est") || s.includes("pt") || s.includes("ct"))) return false;
+  return true;
+}
+
 function normalizeTeamAbbr(teamAbbr: string): string {
   const aliases: Record<string, string> = {
     GSW: "GS",
@@ -82,6 +91,15 @@ export default function PlayerPropCard({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
+          {isGameLive(data.game_status) && (
+            <div className="flex shrink-0 flex-col items-center gap-0.5">
+              <span className="relative flex h-2.5 w-2.5" title="Live">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Live</span>
+            </div>
+          )}
           {imgFailed ? (
             <div className="flex h-14 w-14 items-center justify-center rounded-full border border-zinc-300 bg-zinc-100 text-xs font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               {initials || "N/A"}
@@ -101,8 +119,13 @@ export default function PlayerPropCard({
             <div className="text-lg font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
               <HighlightedName name={data.player_name} query={highlightQuery} />
             </div>
-            <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {data.team_abbr} vs {data.opponent_abbr}
+            <div className="mt-1 flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+              <span>{data.team_abbr} vs {data.opponent_abbr}</span>
+              {data.game_status && (
+                <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                  · {data.game_status}
+                </span>
+              )}
             </div>
           </div>
         </div>

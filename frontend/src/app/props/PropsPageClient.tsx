@@ -15,6 +15,22 @@ const PROPS_API_URL = isLocal
   : `https://${BACKEND_URL}/api/props`;
 const PROPS_TOPIC = "props";
 
+function isGameLive(status: string | undefined): boolean {
+  const s = (status ?? "").trim().toLowerCase();
+  if (!s) return false;
+  if (s.includes("final")) return false;
+  if (s.includes("pm") || s.includes("am")) return false;
+  if (
+    /\b(am|pm)\b/.test(s) &&
+    (s.includes("et") ||
+      s.includes("est") ||
+      s.includes("pt") ||
+      s.includes("ct"))
+  )
+    return false;
+  return true;
+}
+
 function isPropsSnapshotResponse(
   payload: unknown,
 ): payload is PropsSnapshotResponse {
@@ -47,6 +63,7 @@ export default function PropsPageClient() {
   const teamParam = searchParams.get("team");
   const sortParam = searchParams.get("sort");
   const queryParam = searchParams.get("q") ?? "";
+  const liveParam = searchParams.get("live");
 
   const [selectedTeam, setSelectedTeam] = useState<string>(() =>
     teamParam ? teamParam : "All",
@@ -55,6 +72,9 @@ export default function PropsPageClient() {
     sortParam && ["All", "PTS", "REB", "AST"].includes(sortParam)
       ? sortParam
       : "All",
+  );
+  const [liveFilter, setLiveFilter] = useState<string>(() =>
+    liveParam && ["all", "live", "not"].includes(liveParam) ? liveParam : "all",
   );
   const [searchQuery, setSearchQuery] = useState<string>(queryParam);
   const [debouncedQuery, setDebouncedQuery] = useState<string>(queryParam);
@@ -78,6 +98,7 @@ export default function PropsPageClient() {
 
     if (selectedTeam !== "All") params.set("team", selectedTeam);
     if (selectedCategory !== "All") params.set("sort", selectedCategory);
+    if (liveFilter !== "all") params.set("live", liveFilter);
     if (trimmedQuery) params.set("q", trimmedQuery);
 
     const nextQuery = params.toString();
@@ -90,6 +111,7 @@ export default function PropsPageClient() {
     }
   }, [
     debouncedQuery,
+    liveFilter,
     pathname,
     router,
     searchParams,
@@ -175,6 +197,12 @@ export default function PropsPageClient() {
     let result = [...snapshot.projections];
     const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
+    if (liveFilter === "live") {
+      result = result.filter((p) => isGameLive(p.game_status));
+    } else if (liveFilter === "not") {
+      result = result.filter((p) => !isGameLive(p.game_status));
+    }
+
     if (selectedTeam !== "All") {
       result = result.filter((p) => p.team_abbr === selectedTeam);
     }
@@ -196,17 +224,25 @@ export default function PropsPageClient() {
     }
 
     return result;
-  }, [snapshot.projections, selectedTeam, selectedCategory, debouncedQuery]);
+  }, [
+    snapshot.projections,
+    selectedTeam,
+    selectedCategory,
+    liveFilter,
+    debouncedQuery,
+  ]);
 
   const clearFilters = () => {
     setSelectedTeam("All");
     setSelectedCategory("All");
+    setLiveFilter("all");
     setSearchQuery("");
   };
 
   const hasActiveFilters =
     selectedTeam !== "All" ||
     selectedCategory !== "All" ||
+    liveFilter !== "all" ||
     searchQuery.trim() !== "";
   const totalProps = snapshot.projections.length;
   const visibleProps = filteredProps.length;
@@ -245,6 +281,31 @@ export default function PropsPageClient() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="font-semibold uppercase text-neutral-950 dark:text-zinc-100">
+              Game Status
+            </label>
+            <div className="flex gap-2">
+              {[
+                { value: "all", label: "All" },
+                { value: "live", label: "Live" },
+                { value: "not", label: "Not Live" },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setLiveFilter(value)}
+                  className={`h-10 rounded-lg px-4 text-sm font-medium transition-colors ${
+                    liveFilter === value
+                      ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -359,7 +420,6 @@ export default function PropsPageClient() {
             .
           </p>
         </section>
-
       </div>
     </main>
   );

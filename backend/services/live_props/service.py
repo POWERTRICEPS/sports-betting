@@ -88,6 +88,7 @@ def _projection_row(
     projected_pts: float,
     projected_reb: float,
     projected_ast: float,
+    game_status: str = "",
     features: dict[str, dict[str, float]] | None = None,
     model_outputs: dict[str, float] | None = None,
 ) -> dict[str, Any]:
@@ -102,6 +103,7 @@ def _projection_row(
         "projected_pts": projected_pts,
         "projected_reb": projected_reb,
         "projected_ast": projected_ast,
+        "game_status": game_status,
         "source": "model",
     }
     if features is not None:
@@ -112,7 +114,7 @@ def _projection_row(
 
 
 def _to_implied_final(current_value: float, remaining_value: float) -> float:
-    return round(max(0.0, float(current_value) + float(remaining_value)), 2)
+    return round(max(0.0, float(current_value) + float(remaining_value)), 1)
 
 
 def _build_pregame_player_stub(starter: dict[str, Any]) -> dict[str, Any]:
@@ -345,6 +347,7 @@ def compute_live_props_snapshot(game_date: str | None = None, debug: bool = Fals
                         projected_pts=pts,
                         projected_reb=reb,
                         projected_ast=ast,
+                        game_status=game_context.get("status", ""),
                         features=(
                             {
                                 "base": {k: float(v) for k, v in base_features.items()},
