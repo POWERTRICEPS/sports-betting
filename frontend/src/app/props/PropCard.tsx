@@ -143,19 +143,19 @@ export default function PlayerPropCard({
           <div>
             <div className="text-xs text-zinc-500 dark:text-zinc-400">PTS</div>
             <div className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-              {data.projected_pts}
+              {Number(data.projected_pts).toFixed(1)}
             </div>
           </div>
           <div>
             <div className="text-xs text-zinc-500 dark:text-zinc-400">REB</div>
             <div className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-              {data.projected_reb}
+              {Number(data.projected_reb).toFixed(1)}
             </div>
           </div>
           <div>
             <div className="text-xs text-zinc-500 dark:text-zinc-400">AST</div>
             <div className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-              {data.projected_ast}
+              {Number(data.projected_ast).toFixed(1)}
             </div>
           </div>
         </div>
