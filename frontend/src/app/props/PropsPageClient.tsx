@@ -574,12 +574,28 @@ export default function PropsPageClient() {
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 relative">
               {isOddsLoading ? (
                 <div className="py-8 text-center text-base text-zinc-500 dark:text-zinc-400">
                   Loading odds...
                 </div>
               ) : playerBookProps && allBookmakers.length > 0 ? (
+                <>
+                  <div className="group absolute top-0 right-0 z-10">
+                    <div className="flex h-6 w-6 cursor-help items-center justify-center rounded-full bg-zinc-200 text-sm font-bold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+                      ?
+                    </div>
+                    <div className="absolute bottom-full right-0 mb-2 w-64 rounded-md bg-zinc-800 p-3 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-zinc-900 border border-zinc-700 pointer-events-none">
+                      <p className="font-semibold">Line Coloring</p>
+                      <p className="mt-2">
+                        <span className="font-bold text-green-400">Green:</span> Line is at or below our projection (favors Over).
+                      </p>
+                      <p className="mt-1">
+                        <span className="font-bold text-red-400">Red:</span> Line is above our projection (favors Under).
+                      </p>
+                    </div>
+                  </div>
+
                 <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
                   <table className="w-full min-w-max divide-y divide-zinc-200 text-base dark:divide-zinc-700">
                     <thead className="bg-zinc-50 dark:bg-zinc-800/50">
@@ -637,7 +653,7 @@ export default function PropsPageClient() {
                             return (
                               <td
                                 key={stat}
-                                className="px-4 py-3 text-zinc-700 dark:text-zinc-300"
+                                className="px-4 py-3 text-zinc-700 dark:text-zinc-300 text-center"
                               >
                                 {overData || underData ? (
                                   <div className="flex flex-col items-center text-sm">
@@ -667,6 +683,7 @@ export default function PropsPageClient() {
                     </tbody>
                   </table>
                 </div>
+                </>
               ) : (
                 <div className="py-8 text-center text-base text-zinc-500 dark:text-zinc-400">
                   No odds available for this player.
