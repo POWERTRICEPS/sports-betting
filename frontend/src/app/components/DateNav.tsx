@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect } from "react";
-import { getTodayDateInTimeZone } from "@/app/lib/dateId";
+import { getTodayDateInTimeZone } from "@/app/dateId";
 
 const MIN_DATE = "2026-03-07"; // DB has no games before this date
 const MAX_DATE = "2026-04-12"; // max selectable date

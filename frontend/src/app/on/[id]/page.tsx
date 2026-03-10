@@ -1,6 +1,6 @@
 import GamesByDate from "./gamesByDate";
 import { redirect } from "next/navigation";
-import { getTodayDateId } from "@/app/lib/dateId";
+import { getTodayDateId } from "@/app/dateId";
 
 export default async function GamesPage({ params }: { params: { id: string } }) {
     const p = await params;

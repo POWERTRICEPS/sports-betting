@@ -6,7 +6,7 @@ import { GameCardsSkeleton, GamesListEmptyState } from "./games/GameStates";
 import Standings from "./standings/Standings";
 import { useGameData } from "./GameDataProvider";
 import DateNav from "./components/DateNav";
-import { getTodayDateInTimeZone } from "./lib/dateId";
+import { getTodayDateInTimeZone } from "./dateId";
 
 export default function GamesPage() {
   const { games, gamesLoading, status, error } = useGameData();
