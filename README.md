@@ -38,7 +38,7 @@ This project employs frontend with Next.js due to its ease of use and compatibil
 
 The first user role that we are targeting are NBA fans who are actively watching games in real time and want to have another layer of information that they are able to access during the games. This information would consist of live probabilities as well as player performance and projections. More specifically, these users would mainly be focused on viewing live NBA games and matchups, player performance projects for each game, and real-time win probabilities for the games as well.
 
-The next user role would be sports bettors. They would have a similar role to your average NBA fan but would be more inclined to focusing on the player projects and the real-time win projections of the games. This would help them make a better informed decision for their bets. This platform helps users accomplish their goals by ingesting live NBA game data, running predictive models to broadcast live odds updates to all users in real time all in on dashboard. This allows users to stay up to date and informed throughout the game for all their needs.
+The next user role would be sports bettors. They would have a similar role to your average NBA fan but would be more inclined to focusing on the player projections and the real-time win projections of the games. This would help them make a better-informed decision for their bets. This platform helps users accomplish their goals by ingesting live NBA game data, running predictive models to broadcast live odds updates to all users in real time all in on dashboard. This allows users to stay up to date and informed throughout the game for all their needs.
 
 ## Group Members
 
@@ -168,9 +168,9 @@ This application provides real-time and near–real-time NBA analytics, includin
 - **Live Games**
   - View active NBA games and scores
   - Backend polls NBA live data and broadcasts updates
-- **(Planned) Win Probability & Player Props**
+- **Win Probability & Player Props**
   - Live win probability modeling
-  - Player over/under probability projections
+  - Player points/rebounds/assists projections by the end of the game
 
 Typical usage flow:
 
