@@ -29,6 +29,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 
 type GameDataContextValue = {
   games: Game[];
+  gamesLoading: boolean;
   status: ConnectionStatus;
   error: string | null;
   reconnect: () => void;
@@ -40,6 +41,7 @@ const GameDataContext = createContext<GameDataContextValue | null>(null);
 
 export function GameDataProvider({ children }: { children: React.ReactNode }) {
   const [games, setGames] = useState<Game[]>([]);
+  const [gamesLoading, setGamesLoading] = useState<boolean>(true);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [standings, setStandings] = useState<StandingsResponse | null>(null);
@@ -52,6 +54,7 @@ export function GameDataProvider({ children }: { children: React.ReactNode }) {
 
   // used for initial data population
   const fetchGames = useCallback(async () => {
+    setGamesLoading(true);
     try {
       const res = await fetch(API_URL);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -64,6 +67,8 @@ export function GameDataProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Fetch games failed:", e);
       setError("Failed to fetch games");
+    } finally {
+      setGamesLoading(false);
     }
   }, []);
 
@@ -185,6 +190,7 @@ export function GameDataProvider({ children }: { children: React.ReactNode }) {
 
   const value: GameDataContextValue = {
     games,
+    gamesLoading,
     status,
     error,
     reconnect,

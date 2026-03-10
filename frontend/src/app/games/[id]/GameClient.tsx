@@ -3,9 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Game } from "@/app/types";
-import { mockGames } from "../mock";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import WinProbabilityGraph from "./WinProbabilityGraph";
+import {
+  GameDetailErrorState,
+  GameDetailLoadingState,
+} from "../GameStates";
 
 const BACKEND_URL = "pj09-sports-betting.onrender.com";
 // const BACKEND_URL = "localhost:8000";
@@ -17,27 +20,38 @@ const API_URL = isLocal ? `http://${BACKEND_URL}` : `https://${BACKEND_URL}`;
 export default function GameClient({ id }: { id: string }) {
   const imgSize = 150;
   const [game, setGame] = useState<Game | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [hasInitialGame, setHasInitialGame] = useState<boolean>(false);
   const wsRef = useRef<WebSocket | null>(null);
+
+  const fetchGame = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/games/stats/${id}`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      setGame(data);
+      setHasInitialGame(true);
+    } catch (err) {
+      console.error("Failed to fetch game data:", err);
+      setGame(null);
+      setHasInitialGame(false);
+      setError("Failed to load game details.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
 
   // Initial HTTP fetch for immediate data on page load
   useEffect(() => {
-    async function fetchGame() {
-      try {
-        const res = await fetch(`${API_URL}/api/games/stats/${id}`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        setGame(data);
-      } catch (err) {
-        console.error("Failed to fetch game data:", err);
-        const fallbackGame = mockGames[0];
-        setGame(fallbackGame);
-      }
-    }
     fetchGame();
-  }, [id]);
+  }, [fetchGame]);
 
   // WebSocket subscription for live updates (single game only)
   useEffect(() => {
+    if (!hasInitialGame) return;
     const topic = `game:${id}`;
 
     function connect() {
@@ -81,14 +95,14 @@ export default function GameClient({ id }: { id: string }) {
     return () => {
       const ws = wsRef.current;
       if (ws) {
-        if (ws.readyState === WebSocket.OPEN) {
+        if (ws.readyState === 1) {
           ws.send(JSON.stringify({ type: "unsubscribe", topic }));
         }
         ws.close();
         wsRef.current = null;
       }
     };
-  }, [id]);
+  }, [hasInitialGame, id]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 p-6 pt-20 text-gray-900 dark:text-zinc-100">
@@ -101,6 +115,19 @@ export default function GameClient({ id }: { id: string }) {
           Back to Games
         </Link>
       </div>
+
+      {isLoading ? (
+        <div className="mx-auto mt-16 max-w-7xl">
+          <GameDetailLoadingState />
+        </div>
+      ) : error ? (
+        <div className="mx-auto mt-16 max-w-7xl">
+          <GameDetailErrorState message={error} onRetry={fetchGame} />
+        </div>
+      ) : null}
+
+      {!game || isLoading || error ? null : (
+        <>
       <div className="mx-auto max-w-7xl"></div>
       <div className="mx-auto max-w-7xl">
         <div className="rounded-2xl bg-white dark:bg-zinc-900 shadow-sm border border-gray-200 dark:border-zinc-700 p-8 sm:p-10">
@@ -412,6 +439,8 @@ export default function GameClient({ id }: { id: string }) {
 
         {game && <WinProbabilityGraph game={game} />}
       </div>
+        </>
+      )}
     </div>
   );
 }

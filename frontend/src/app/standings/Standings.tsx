@@ -53,7 +53,7 @@ export default function Standings() {
       : standings?.west_standings;
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 h-full flex flex-col">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
           NBA Standings
@@ -85,7 +85,7 @@ export default function Standings() {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden">
+      <div>
         {standingsLoading ? (
           <div className="flex h-40 items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">
             Loading...

@@ -13,16 +13,14 @@ function formatProb(n: number | null) {
 
 const imgSize = 100;
 
-export default function GameCard({ data }: { data: Game }) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
+type GameCardProps = {
+  data: Game;
+  isPinned: boolean;
+  onTogglePin: (gameId: string) => void;
+};
 
-  if(typeof window !== "undefined") {
-    let pinnedGames = JSON.parse(localStorage.getItem("pinnedGames") || "[]") as string[];
-    useState(() => {
-      setIsPinned(pinnedGames.includes(data.game_id));
-    });
-  }
+export default function GameCard({ data, isPinned, onTogglePin }: GameCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
 
   const homePrimary =
     teamPrimaryColors[data.home_abbreviation] ?? "#1F2937";
@@ -50,16 +48,7 @@ export default function GameCard({ data }: { data: Game }) {
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setIsPinned((prev) => !prev);
-          
-          localStorage.getItem("pinnedGames");
-          let pinnedGames = JSON.parse(localStorage.getItem("pinnedGames") || "[]") as string[];
-          if (pinnedGames.includes(data.game_id)) {
-            pinnedGames = pinnedGames.filter((id) => id !== data.game_id);
-          } else {
-            pinnedGames.push(data.game_id);
-          }
-          localStorage.setItem("pinnedGames", JSON.stringify(pinnedGames));
+          onTogglePin(data.game_id);
         }}
         className={`
           absolute top-3 right-3 z-10
