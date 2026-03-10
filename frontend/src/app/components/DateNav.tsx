@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect } from "react";
+import { getTodayDateInTimeZone } from "@/app/lib/dateId";
 
 const MIN_DATE = "2026-03-07"; // DB has no games before this date
 const MAX_DATE = "2026-04-12"; // max selectable date
@@ -70,7 +71,7 @@ export default function DateNav({ date: today }: { date: Date }) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const realToday = new Date(); // actual current date for Today button
+  const realToday = getTodayDateInTimeZone(); // shared timezone "today"
   const calendarRef = useRef<HTMLDivElement>(null);
 
   // Click outside to close
