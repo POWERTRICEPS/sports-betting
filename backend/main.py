@@ -25,7 +25,7 @@ from database import (
     past_game_row_to_dashboard_game,
     get_historical_team_stats,
     get_probability_history,
-    save_probability_history,
+    append_probability_history,
     is_game_final,
 )
 from services.live_props.poller import props_poll_loop
@@ -65,6 +65,25 @@ async def update_games_and_probabilities():
             if len(history) > app_state.MAX_PROB_HISTORY:
                 del history[0]
 
+    # Persist only snapshots added since last successful persistence.
+    for game in games:
+        game_id = str(game["game_id"])
+        history = app_state.PROBABILITY_HISTORY.get(game_id, [])
+        if not history:
+            continue
+
+        last_idx = app_state.LAST_PERSISTED_PROB_INDEX_BY_GAME.get(game_id, 0)
+        # If history was capped, reset cursor safely.
+        if last_idx > len(history):
+            last_idx = len(history)
+
+        if len(history) <= last_idx:
+            continue
+
+        new_snaps = history[last_idx:]
+        await append_probability_history(game_id, new_snaps)
+        app_state.LAST_PERSISTED_PROB_INDEX_BY_GAME[game_id] = len(history)
+
     result = merge_gp(games, probabilities)
     games_targets = manager.topic_connection_labels("games")
     print(
@@ -89,13 +108,6 @@ async def update_games_and_probabilities():
         to_save = [m for m in all_games_stats if str(m.get("game_id")) in newly_final_ids]
         print(f"to_save: {to_save}")
         await save_completed_games_to_db(to_save)
-
-        # Persist probability history for each newly finished game
-        for g in newly_final:
-            gid = str(g["game_id"])
-            history = app_state.PROBABILITY_HISTORY.get(gid, [])
-            if history:
-                await save_probability_history(gid, history)
 
         # update in-memory store with finished game IDs
         for g in newly_final:
@@ -125,9 +137,10 @@ async def update_subscribed_game_stats():
                 continue
 
             merged = merge_gp([target], probabilities)[0]
-            merged["probability_history"] = list(
-                app_state.PROBABILITY_HISTORY.get(game_id, [])
-            )
+            prob_hist = app_state.PROBABILITY_HISTORY.get(game_id, [])
+            if not prob_hist:
+                prob_hist = get_probability_history(game_id)
+            merged["probability_history"] = list(prob_hist)
 
             topic = f"game:{game_id}"
 
@@ -493,9 +506,10 @@ def single_game_stats(game_id: str):
             return {"error": "Invalid game_id"}, 404
         
         result = merge_gp([target], p)
-        result[0]["probability_history"] = list(
-            app_state.PROBABILITY_HISTORY.get(game_id, [])
-        )
+        prob_hist = app_state.PROBABILITY_HISTORY.get(game_id, [])
+        if not prob_hist:
+            prob_hist = get_probability_history(game_id)
+        result[0]["probability_history"] = list(prob_hist)
         print(result[0])
         return result[0]
     except Exception as e:

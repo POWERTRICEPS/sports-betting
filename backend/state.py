@@ -18,6 +18,10 @@ PROBABILITIES_STATE: dict[str, dict[str, float]] = {}
 MAX_PROB_HISTORY = 2000
 PROBABILITY_HISTORY: dict[str, list[dict[str, Any]]] = {}
 
+# Last in-memory snapshot index persisted to DB per game.
+# Used to persist only new snapshots each poll cycle.
+LAST_PERSISTED_PROB_INDEX_BY_GAME: dict[str, int] = {}
+
 # Player props by player name for upcoming days
 # {'player name': {'bookmaker': {'points': {'over_odds': -120, 'under_odds': 100, 'line': 17.5}}}}
 PLAYER_PROPS_STATE: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}   # player name -> bookmaker -> stat -> odds

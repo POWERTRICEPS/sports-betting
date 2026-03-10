@@ -10,12 +10,8 @@ import Standings from "../../standings/Standings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Game } from "@/app/types";
 import DateNav from "@/app/components/DateNav";
-
-const BACKEND_URL = "pj09-sports-betting.onrender.com";
-// const BACKEND_URL = "localhost:8000";
-const isLocal =
-  BACKEND_URL.startsWith("localhost") || BACKEND_URL.startsWith("127.0.0.1");
-const API_URL = isLocal ? `http://${BACKEND_URL}` : `https://${BACKEND_URL}`;
+import { getTodayDateId } from "@/app/dateId";
+import { backendApiUrl } from "@/app/backend";
 
 export default function GamesByDate({ id }: { id: string }) {
   const [displayGames, setDisplayGames] = useState<Game[]>([]);
@@ -58,7 +54,7 @@ export default function GamesByDate({ id }: { id: string }) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/games/${id}`);
+      const res = await fetch(backendApiUrl(`/api/games/${id}`));
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setDisplayGames(Array.isArray(data) ? data : []);
@@ -87,6 +83,7 @@ export default function GamesByDate({ id }: { id: string }) {
     });
     return sorted;
   }, [displayGames, pinnedGames]);
+  const isFutureDate = id > getTodayDateId();
 
   const today = new Date(
     Number(id.slice(0, 4)),
@@ -113,6 +110,8 @@ export default function GamesByDate({ id }: { id: string }) {
                   data={game}
                   isPinned={pinnedGames.includes(game.game_id)}
                   onTogglePin={onTogglePin}
+                  disableNavigation={isFutureDate}
+                  disabledReason="Game details will be available on game day."
                 />
               ))
             ) : (

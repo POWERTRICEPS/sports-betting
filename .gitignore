@@ -131,6 +131,7 @@ celerybeat.pid
 
 # Environments
 .env
+!.env.example
 .venv
 env/
 venv/
@@ -197,6 +198,7 @@ frontend/build/
 
 # env files
 frontend/.env*
+!frontend/.env.example
 
 # vercel
 frontend/.vercel
