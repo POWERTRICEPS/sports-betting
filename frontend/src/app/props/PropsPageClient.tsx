@@ -7,6 +7,7 @@ import type { ConnectionStatus, PlayerProjection, PlayerProps, PropsSnapshotResp
 import PlayerPropCard from "./PropCard";
 import { BACKEND_WS_URL, backendApiUrl } from "@/app/backend";
 import { teamPrimaryColors, teamSecondaryColors } from "../resources/colors";
+import { classifyGameStatus } from "./gameStatus";
 
 const PROPS_API_URL = backendApiUrl("/api/props");
 const BOOK_PROPS_API_URL = (name: string) => backendApiUrl(`/api/props/odds/${name}`);
@@ -81,7 +82,7 @@ export default function PropsPageClient() {
   const teamParam = searchParams.get("team");
   const sortParam = searchParams.get("sort");
   const queryParam = searchParams.get("q") ?? "";
-  const liveParam = searchParams.get("live");
+  const statusParam = searchParams.get("status") ?? searchParams.get("live");
 
   const [selectedTeam, setSelectedTeam] = useState<string>(() =>
     teamParam ? teamParam : "All",
@@ -91,8 +92,13 @@ export default function PropsPageClient() {
       ? sortParam
       : "All",
   );
-  const [liveFilter, setLiveFilter] = useState<string>(() =>
-    liveParam && ["all", "live", "not"].includes(liveParam) ? liveParam : "all",
+  const [statusFilter, setStatusFilter] = useState<string>(() =>
+    statusParam &&
+    ["all", "live", "pregame", "final", "not"].includes(statusParam)
+      ? statusParam === "not"
+        ? "pregame"
+        : statusParam
+      : "all",
   );
   const [searchQuery, setSearchQuery] = useState<string>(queryParam);
   const [debouncedQuery, setDebouncedQuery] = useState<string>(queryParam);
@@ -116,7 +122,7 @@ export default function PropsPageClient() {
 
     if (selectedTeam !== "All") params.set("team", selectedTeam);
     if (selectedCategory !== "All") params.set("sort", selectedCategory);
-    if (liveFilter !== "all") params.set("live", liveFilter);
+    if (statusFilter !== "all") params.set("status", statusFilter);
     if (trimmedQuery) params.set("q", trimmedQuery);
 
     const nextQuery = params.toString();
@@ -129,7 +135,7 @@ export default function PropsPageClient() {
     }
   }, [
     debouncedQuery,
-    liveFilter,
+    statusFilter,
     pathname,
     router,
     searchParams,
@@ -261,10 +267,10 @@ export default function PropsPageClient() {
     let result = [...snapshot.projections];
     const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
-    if (liveFilter === "live") {
-      result = result.filter((p) => isGameLive(p.game_status));
-    } else if (liveFilter === "not") {
-      result = result.filter((p) => !isGameLive(p.game_status));
+    if (statusFilter !== "all") {
+      result = result.filter(
+        (p) => classifyGameStatus(p.game_status) === statusFilter,
+      );
     }
 
     if (selectedTeam !== "All") {
@@ -292,21 +298,21 @@ export default function PropsPageClient() {
     snapshot.projections,
     selectedTeam,
     selectedCategory,
-    liveFilter,
+    statusFilter,
     debouncedQuery,
   ]);
 
   const clearFilters = () => {
     setSelectedTeam("All");
     setSelectedCategory("All");
-    setLiveFilter("all");
+    setStatusFilter("all");
     setSearchQuery("");
   };
 
   const hasActiveFilters =
     selectedTeam !== "All" ||
     selectedCategory !== "All" ||
-    liveFilter !== "all" ||
+    statusFilter !== "all" ||
     searchQuery.trim() !== "";
   const totalProps = snapshot.projections.length;
   const visibleProps = filteredProps.length;
@@ -355,13 +361,14 @@ export default function PropsPageClient() {
               {[
                 { value: "all", label: "All" },
                 { value: "live", label: "Live" },
-                { value: "not", label: "Not Live" },
+                { value: "pregame", label: "Pregame" },
+                { value: "final", label: "Final" },
               ].map(({ value, label }) => (
                 <button
                   key={value}
-                  onClick={() => setLiveFilter(value)}
+                  onClick={() => setStatusFilter(value)}
                   className={`h-10 rounded-lg px-4 text-sm font-medium transition-colors ${
-                    liveFilter === value
+                    statusFilter === value
                       ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500"
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   }`}
