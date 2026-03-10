@@ -113,3 +113,23 @@ export interface PropsSnapshotResponse {
   updated_at: string | null;
   projections: PlayerProjection[];
 }
+
+export interface SportsbookOdds {
+  odds: string;
+  line: string;
+}
+
+export interface StatBet {
+  over: {
+    [sportsbook: string]: SportsbookOdds;
+  };
+  under: {
+    [sportsbook: string]: SportsbookOdds;
+  };
+}
+
+export interface PlayerProps {
+  points: StatBet;
+  rebounds: StatBet;
+  assists: StatBet;
+}
