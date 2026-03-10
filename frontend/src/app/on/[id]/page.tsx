@@ -1,17 +1,10 @@
 import GamesByDate from "./gamesByDate";
 import { redirect } from "next/navigation";
-
-function dateToId(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2,"0"),
-    String(date.getDate()).padStart(2,"0"),
-  ].join("");
-}
+import { getTodayDateId } from "@/app/dateId";
 
 export default async function GamesPage({ params }: { params: { id: string } }) {
     const p = await params;
-    const todayId = dateToId(new Date());
+    const todayId = getTodayDateId();
 
     if (p.id === todayId) {
         redirect(`/`);

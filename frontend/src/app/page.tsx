@@ -6,6 +6,7 @@ import { GameCardsSkeleton, GamesListEmptyState } from "./games/GameStates";
 import Standings from "./standings/Standings";
 import { useGameData } from "./GameDataProvider";
 import DateNav from "./components/DateNav";
+import { getTodayDateInTimeZone } from "./dateId";
 
 export default function GamesPage() {
   const { games, gamesLoading, status, error } = useGameData();
@@ -53,7 +54,7 @@ export default function GamesPage() {
     return sorted;
   }, [games, pinnedGames]);
 
-  let today = new Date();
+  const today = getTodayDateInTimeZone();
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 p-6 pt-20">
