@@ -16,6 +16,7 @@ class PlayerProjection(BaseModel):
     projected_pts: float
     projected_reb: float
     projected_ast: float
+    game_status: str = ""
     features: dict[str, dict[str, float]] | None = None
     model_outputs: dict[str, float] | None = None
     source: Literal["model", "mock"] = "model"

@@ -119,7 +119,7 @@ def sanitize_prediction(value: Any) -> float:
         return 0.0
     if pred > 100:
         return 100.0
-    return round(pred, 2)
+    return round(pred, 1)
 
 
 def predict_remaining(stat: str, features: dict[str, float]) -> float:

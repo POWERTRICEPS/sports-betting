@@ -105,6 +105,7 @@ export interface PlayerProjection {
   projected_pts: number;
   projected_reb: number;
   projected_ast: number;
+  game_status?: string;
   source: "mock" | "model";
 }
 
