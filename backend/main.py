@@ -24,9 +24,10 @@ from database import (
     save_completed_games_to_db,
     past_game_row_to_dashboard_game,
     get_historical_team_stats,
+    get_probability_history,
+    save_probability_history,
     is_game_final,
 )
-from database import fetch_game_history, save_completed_games_to_db
 from services.live_props.poller import props_poll_loop
 from services.live_props.service import compute_live_props_snapshot
 from services.live_props.store import get_snapshot, set_snapshot
@@ -88,6 +89,13 @@ async def update_games_and_probabilities():
         to_save = [m for m in all_games_stats if str(m.get("game_id")) in newly_final_ids]
         print(f"to_save: {to_save}")
         await save_completed_games_to_db(to_save)
+
+        # Persist probability history for each newly finished game
+        for g in newly_final:
+            gid = str(g["game_id"])
+            history = app_state.PROBABILITY_HISTORY.get(gid, [])
+            if history:
+                await save_probability_history(gid, history)
 
         # update in-memory store with finished game IDs
         for g in newly_final:
@@ -467,9 +475,11 @@ def single_game_stats(game_id: str):
         hist = get_historical_team_stats(game_id)
         if not hist:
             return {"error": "Game not found"}, 404
-        hist["probability_history"] = list(
-            app_state.PROBABILITY_HISTORY.get(game_id, [])
-        )
+        # Try in-memory first (game just finished), fall back to database
+        prob_hist = app_state.PROBABILITY_HISTORY.get(game_id, [])
+        if not prob_hist:
+            prob_hist = get_probability_history(game_id)
+        hist["probability_history"] = list(prob_hist)
         return hist
     
     # Fetch full stats for this specific game
