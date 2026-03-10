@@ -181,6 +181,8 @@ http://localhost:3000
 
 ### Backend (Render Web Service)
 
+Production URL: https://pj09-sports-betting.onrender.com
+
 Deploy from the `backend/` directory.
 
 - **Build command**
@@ -197,6 +199,8 @@ Notes:
 - Historical game pages and persisted win-probability timelines rely on the database.
 
 ### Frontend (Vercel)
+
+Production URL: https://pj09-sports-betting.vercel.app/
 
 Deploy from the `frontend/` directory.
 
