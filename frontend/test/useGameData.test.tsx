@@ -1,13 +1,14 @@
 ///<reference types="jest" />
 
 import { render, screen, waitFor, act } from "@testing-library/react";
-import { useGameData } from "../src/app/GameDataProvider";
+import { GameDataProvider, useGameData } from "../src/app/GameDataProvider";
 
 // Minimal test component that uses the hook
 function TestComponent() {
-	const { games, status, error } = useGameData();
+	const { games, gamesLoading, status, error } = useGameData();
 	return (
 		<div>
+			<div data-testid="games-loading">{String(gamesLoading)}</div>
 			<div data-testid="status">{status}</div>
 			<div data-testid="games">{JSON.stringify(games)}</div>
 			<div data-testid="error">{error ?? ""}</div>
@@ -86,7 +87,11 @@ describe("useGameData hook", () => {
 
 	// TEST 1: Verify hook fetches initial data and updates on websocket message
 	it("fetches initial games and updates from websocket", async () => {
-		render(<TestComponent />);
+		render(
+			<GameDataProvider>
+				<TestComponent />
+			</GameDataProvider>,
+		);
 
 		// wait for fetch to resolve and initial render
 		await waitFor(() => {
@@ -116,7 +121,11 @@ describe("useGameData hook", () => {
 			json: async () => [{ game_id: "g1", status: "Final" }],
 		});
 		(global as any).WebSocket = MockWebSocket as any;
-		render(<TestComponent />);
+		render(
+			<GameDataProvider>
+				<TestComponent />
+			</GameDataProvider>,
+		);
 
 		// wait for initial fetch to settle and mock ws to be created
 		await waitFor(() => {
@@ -146,12 +155,55 @@ describe("useGameData hook", () => {
 		});
 
 		(global as any).WebSocket = NoOpenMockWebSocket as any;
-		render(<TestComponent />);
+		render(
+			<GameDataProvider>
+				<TestComponent />
+			</GameDataProvider>,
+		);
 
 		await waitFor(() => {
 			expect(screen.getByTestId("error").textContent).toContain(
 				"Failed to fetch games",
 			);
+		});
+	});
+
+	it("tracks gamesLoading during initial games fetch", async () => {
+		let resolveGamesFetch: ((value: any) => void) | null = null;
+		const gamesFetchPromise = new Promise((resolve) => {
+			resolveGamesFetch = resolve;
+		});
+
+		(global as any).fetch = jest.fn().mockImplementation((url: string) => {
+			if (url.includes("/api/games")) {
+				return gamesFetchPromise;
+			}
+			return Promise.resolve({
+				ok: true,
+				json: async () => [{ east_standings: [], west_standings: [] }],
+			});
+		});
+
+		(global as any).WebSocket = NoOpenMockWebSocket as any;
+		render(
+			<GameDataProvider>
+				<TestComponent />
+			</GameDataProvider>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("games-loading").textContent).toBe("true");
+		});
+
+		act(() => {
+			resolveGamesFetch?.({
+				ok: true,
+				json: async () => [{ game_id: "g1", status: "Final" }],
+			});
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("games-loading").textContent).toBe("false");
 		});
 	});
 });

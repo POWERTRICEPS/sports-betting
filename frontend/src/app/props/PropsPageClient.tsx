@@ -325,6 +325,41 @@ export default function PropsPageClient() {
           </p>
           {error && <p className="mt-1 text-red-500">{error}</p>}
         </div>
+
+        <section className="mt-8 border-t border-zinc-200 pt-6 text-center text-sm leading-7 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+          <p>
+            This app is for informational and educational purposes only. Stats,
+            win probabilities, and player projections are estimates and may be
+            delayed, incomplete, or inaccurate. Nothing shown in this app is
+            financial, betting, or legal advice, and no outcome is guaranteed.
+          </p>
+          <p className="mt-4">
+            Users are responsible for verifying all information with official
+            sources and for following the laws and age requirements in their
+            location. This project is not a sportsbook and does not accept
+            wagers.
+          </p>
+          <p className="mt-4">
+            If gambling is causing harm, help is available 24/7 in the U.S. at{" "}
+            <a
+              href="tel:18004262537"
+              className="font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+            >
+              1-800-GAMBLER (1-800-426-2537)
+            </a>{" "}
+            or by visiting{" "}
+            <a
+              href="https://www.1800gambler.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+            >
+              1800gambler.net
+            </a>
+            .
+          </p>
+        </section>
+
       </div>
     </main>
   );

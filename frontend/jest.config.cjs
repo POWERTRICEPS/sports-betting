@@ -3,6 +3,7 @@ module.exports = {
   testEnvironment: "jsdom",
   testMatch: ["**/?(*.)+(test).[tj]s?(x)"],
   moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/src/$1",
     "\\.(css|scss|sass|less|svg)$": "identity-obj-proxy"
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
