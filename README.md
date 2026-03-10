@@ -38,7 +38,7 @@ This project employs frontend with Next.js due to its ease of use and compatibil
 
 The first user role that we are targeting are NBA fans who are actively watching games in real time and want to have another layer of information that they are able to access during the games. This information would consist of live probabilities as well as player performance and projections. More specifically, these users would mainly be focused on viewing live NBA games and matchups, player performance projects for each game, and real-time win probabilities for the games as well.
 
-The next user role would be sports bettors. They would have a similar role to your average NBA fan but would be more inclined to focusing on the player projections and the real-time win projections of the games. This would help them make a better-informed decision for their bets. This platform helps users accomplish their goals by ingesting live NBA game data, running predictive models to broadcast live odds updates to all users in real time all in on dashboard. This allows users to stay up to date and informed throughout the game for all their needs.
+The next user role would be sports bettors. They would have a similar role to your average NBA fan but would be more inclined to focusing on the player projects and the real-time win projections of the games. This would help them make a better informed decision for their bets. This platform helps users accomplish their goals by ingesting live NBA game data, running predictive models to broadcast live odds updates to all users in real time all in on dashboard. This allows users to stay up to date and informed throughout the game for all their needs.
 
 ## Group Members
 
@@ -60,8 +60,8 @@ The next user role would be sports bettors. They would have a similar role to yo
 Before setting up the project, make sure you have the following installed:
 
 - **Git** (for cloning the repository)
-- **Python 3.10+** (recommended for FastAPI and `nba_api`)
-- **Node.js 18+** and **npm** (for the Next.js frontend)
+- **Python 3.11+** (recommended for FastAPI + scientific stack)
+- **Node.js 20+** and **npm** (for Next.js 16 frontend)
 - **pip** (comes with Python)
 - _(Optional)_ Python’s built-in `venv` for virtual environments
 
@@ -103,17 +103,17 @@ git clone https://github.com/ucsb-cs148-w26/pj09-sports-betting.git
 cd pj09-sports-betting
 ```
 
-### 2. Switch to local backend
+### 2. Configure frontend backend URL
 
-By default, the frontend talks to the deployed backend.
-To use local backend instead, set this env var before running frontend:
+By default, the frontend talks to the deployed backend (`onrender`).
+To point frontend at local backend, create `frontend/.env.local`:
 
 ```bash
 cd frontend
 echo "NEXT_PUBLIC_BACKEND_URL=http://localhost:8000" > .env.local
 ```
 
-You can switch back to production by removing the file or setting:
+To switch back to production backend, remove `frontend/.env.local` or set:
 
 ```bash
 NEXT_PUBLIC_BACKEND_URL=https://pj09-sports-betting.onrender.com
@@ -128,6 +128,25 @@ source venv/bin/activate   # macOS / Linux
 # venv\Scripts\Activate    # Windows
 
 pip install -r requirements.txt
+```
+
+Create backend env file (`backend/.env`) with database credentials:
+
+```bash
+# preferred (Render-style single URL)
+DATABASE_URL=postgresql://<user>:<password>@<host>:5432/<db_name>
+
+# optional, only needed for player prop odds endpoint
+ODDS_API_KEY=<your_odds_api_key>
+```
+
+If running with a local Postgres instead of `DATABASE_URL`, backend also supports:
+`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+
+Initialize database schema (first time only):
+
+```bash
+psql "<your_postgres_connection_url>" -f backend/sports-betting-db.sql
 ```
 
 Run the backend server:
@@ -158,6 +177,34 @@ The frontend will be available at:
 http://localhost:3000
 ```
 
+## Deployment (Current)
+
+### Backend (Render Web Service)
+
+Deploy from the `backend/` directory.
+
+- **Build command**
+  - `pip install -r requirements.txt`
+- **Start command**
+  - `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- **Required env vars**
+  - `DATABASE_URL` (Postgres connection string)
+- **Optional env vars**
+  - `ODDS_API_KEY`
+
+Notes:
+- WebSocket endpoint is `/ws` on the same backend base URL.
+- Historical game pages and persisted win-probability timelines rely on the database.
+
+### Frontend (Vercel)
+
+Deploy from the `frontend/` directory.
+
+- **Required env vars**
+  - `NEXT_PUBLIC_BACKEND_URL=https://<your-render-service>.onrender.com`
+
+No separate WebSocket env var is required; frontend derives `ws://` / `wss://` automatically from `NEXT_PUBLIC_BACKEND_URL`.
+
 # Functionality
 
 This application provides real-time and near–real-time NBA analytics, including:
@@ -168,9 +215,12 @@ This application provides real-time and near–real-time NBA analytics, includin
 - **Live Games**
   - View active NBA games and scores
   - Backend polls NBA live data and broadcasts updates
-- **Win Probability & Player Props**
-  - Live win probability modeling
-  - Player points/rebounds/assists projections by the end of the game
+- **Win Probability**
+  - Live win probability modeling for active games
+  - Historical probability timeline persistence for completed games
+- **Player Props**
+  - Model-based player projections
+  - Game-state status indicators (`Live`, `Pregame`, `Final`) with filters
 
 Typical usage flow:
 
@@ -179,9 +229,6 @@ Typical usage flow:
 3. View standings, live games, and evolving game data in one place
 
 # Known Problems
-
-- **Win Probability Modeling**  
-  Win probability is not currently implemented and the numbers shown are generated randomly.
 
 - **Blocking NBA API calls**  
   Some NBA API calls are synchronous and may briefly block the event loop during fetches.
