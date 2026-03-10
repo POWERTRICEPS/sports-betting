@@ -4,18 +4,10 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import type { PlayerProjection } from "@/app/types";
 import { teamPrimaryColors, teamSecondaryColors } from "../resources/colors";
+import { classifyGameStatus } from "./gameStatus";
 
 function getHeadshotUrl(espnPlayerId: string): string {
   return `https://a.espncdn.com/i/headshots/nba/players/full/${espnPlayerId}.png`;
-}
-
-function isGameLive(status: string | undefined): boolean {
-  const s = (status ?? "").trim().toLowerCase();
-  if (!s) return false;
-  if (s.includes("final") || s.includes("game over") || s.includes("f/ot")) return false;
-  if (s.includes("pregame") || s.includes("scheduled")) return false;
-  if (/\b(am|pm)\b/.test(s) && (s.includes("et") || s.includes("est") || s.includes("pt") || s.includes("ct"))) return false;
-  return true;
 }
 
 function normalizeTeamAbbr(teamAbbr: string): string {
@@ -68,6 +60,7 @@ export default function PlayerPropCard({
   const colorKey = normalizeTeamAbbr(data.team_abbr);
   const teamPrimary = teamPrimaryColors[colorKey] ?? "#1F2937";
   const teamSecondary = teamSecondaryColors[colorKey] ?? teamPrimary;
+  const gamePhase = classifyGameStatus(data.game_status);
   const initials = useMemo(
     () =>
       data.player_name
@@ -91,13 +84,39 @@ export default function PlayerPropCard({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          {isGameLive(data.game_status) && (
+          {gamePhase !== "unknown" && (
             <div className="flex shrink-0 flex-col items-center gap-0.5">
-              <span className="relative flex h-2.5 w-2.5" title="Live">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Live</span>
+              {gamePhase === "live" ? (
+                <>
+                  <span className="relative flex h-2.5 w-2.5" title="Live">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  </span>
+                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                    Live
+                  </span>
+                </>
+              ) : gamePhase === "pregame" ? (
+                <>
+                  <span
+                    className="inline-flex h-2.5 w-2.5 rounded-full bg-blue-500"
+                    title="Pregame"
+                  />
+                  <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                    Pregame
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span
+                    className="inline-flex h-2.5 w-2.5 rounded-full bg-zinc-500"
+                    title="Final"
+                  />
+                  <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-300">
+                    Final
+                  </span>
+                </>
+              )}
             </div>
           )}
           {imgFailed ? (
