@@ -51,11 +51,14 @@ function HighlightedName({ name, query }: { name: string; query?: string }) {
 export default function PlayerPropCard({
   data,
   highlightQuery,
+  onClick,
 }: {
   data: PlayerProjection;
   highlightQuery?: string;
+  onClick?: () => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const headshotUrl = getHeadshotUrl(data.espn_player_id);
   const colorKey = normalizeTeamAbbr(data.team_abbr);
   const teamPrimary = teamPrimaryColors[colorKey] ?? "#1F2937";
@@ -72,14 +75,24 @@ export default function PlayerPropCard({
     [data.player_name],
   );
   return (
-    <div
-      className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 shadow-sm"
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 shadow-sm text-left disabled:cursor-default enabled:cursor-pointer enabled:transition-all enabled:hover:shadow-lg enabled:hover:scale-105"
       style={{
         background: `
           radial-gradient(ellipse 120% 100% at 0% 0%, ${teamPrimary}65, transparent 65%),
           radial-gradient(ellipse 120% 100% at 100% 0%, ${teamSecondary}65, transparent 65%)
         `,
+        ...(isHovered &&
+          onClick && {
+            boxShadow:
+              "0 0 30px rgba(100, 220, 255, 0.9), inset 0 0 1px rgba(100, 220, 255, 0.3)",
+          }),
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -179,6 +192,6 @@ export default function PlayerPropCard({
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
